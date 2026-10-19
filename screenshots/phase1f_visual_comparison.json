@@ -1,0 +1,231 @@
+{
+	"exact_matches": 24,
+	"non_exact_matches": 8,
+	"pair_count": 32,
+	"pairs": [
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_phase1d_convex_concave_stone_1_0x.png",
+			"phase1f": "phase1f_phase1d_convex_concave_stone_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_phase1d_convex_concave_stone_3_0x.png",
+			"phase1f": "phase1f_phase1d_convex_concave_stone_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_phase1d_dirt_multilevel_phase1a_1_0x.png",
+			"phase1f": "phase1f_phase1d_dirt_multilevel_phase1a_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_phase1d_dirt_multilevel_phase1a_3_0x.png",
+			"phase1f": "phase1f_phase1d_dirt_multilevel_phase1a_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_phase1d_east_west_return_diagnostic_1_0x.png",
+			"phase1f": "phase1f_phase1d_east_west_return_diagnostic_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_phase1d_east_west_return_diagnostic_3_0x.png",
+			"phase1f": "phase1f_phase1d_east_west_return_diagnostic_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_phase1d_multi_elevation_formation_1_0x.png",
+			"phase1f": "phase1f_phase1d_multi_elevation_formation_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_phase1d_multi_elevation_formation_3_0x.png",
+			"phase1f": "phase1f_phase1d_multi_elevation_formation_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 74009,
+			"exact": false,
+			"maximum_channel_delta": 1,
+			"phase1e": "phase1e_phase1d_natural_gameplay_1_0x.png",
+			"phase1f": "phase1f_phase1d_natural_gameplay_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 531,
+			"exact": false,
+			"maximum_channel_delta": 1,
+			"phase1e": "phase1e_phase1d_natural_gameplay_3_0x.png",
+			"phase1f": "phase1f_phase1d_natural_gameplay_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_phase1d_negative_chunk_boundary_1_0x.png",
+			"phase1f": "phase1f_phase1d_negative_chunk_boundary_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_phase1d_negative_chunk_boundary_3_0x.png",
+			"phase1f": "phase1f_phase1d_negative_chunk_boundary_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_phase1d_positive_chunk_boundary_1_0x.png",
+			"phase1f": "phase1f_phase1d_positive_chunk_boundary_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_phase1d_positive_chunk_boundary_3_0x.png",
+			"phase1f": "phase1f_phase1d_positive_chunk_boundary_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 745503,
+			"exact": false,
+			"maximum_channel_delta": 10,
+			"phase1e": "phase1e_phase1d_shoreline_cliffs_1_0x.png",
+			"phase1f": "phase1f_phase1d_shoreline_cliffs_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 750443,
+			"exact": false,
+			"maximum_channel_delta": 11,
+			"phase1e": "phase1e_phase1d_shoreline_cliffs_3_0x.png",
+			"phase1f": "phase1f_phase1d_shoreline_cliffs_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_refined_convex_concave_stone_1_0x.png",
+			"phase1f": "phase1f_refined_convex_concave_stone_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_refined_convex_concave_stone_3_0x.png",
+			"phase1f": "phase1f_refined_convex_concave_stone_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_refined_dirt_multilevel_phase1a_1_0x.png",
+			"phase1f": "phase1f_refined_dirt_multilevel_phase1a_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_refined_dirt_multilevel_phase1a_3_0x.png",
+			"phase1f": "phase1f_refined_dirt_multilevel_phase1a_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_refined_east_west_return_diagnostic_1_0x.png",
+			"phase1f": "phase1f_refined_east_west_return_diagnostic_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_refined_east_west_return_diagnostic_3_0x.png",
+			"phase1f": "phase1f_refined_east_west_return_diagnostic_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_refined_multi_elevation_formation_1_0x.png",
+			"phase1f": "phase1f_refined_multi_elevation_formation_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_refined_multi_elevation_formation_3_0x.png",
+			"phase1f": "phase1f_refined_multi_elevation_formation_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 127319,
+			"exact": false,
+			"maximum_channel_delta": 2,
+			"phase1e": "phase1e_refined_natural_gameplay_1_0x.png",
+			"phase1f": "phase1f_refined_natural_gameplay_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 873,
+			"exact": false,
+			"maximum_channel_delta": 1,
+			"phase1e": "phase1e_refined_natural_gameplay_3_0x.png",
+			"phase1f": "phase1f_refined_natural_gameplay_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_refined_negative_chunk_boundary_1_0x.png",
+			"phase1f": "phase1f_refined_negative_chunk_boundary_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_refined_negative_chunk_boundary_3_0x.png",
+			"phase1f": "phase1f_refined_negative_chunk_boundary_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_refined_positive_chunk_boundary_1_0x.png",
+			"phase1f": "phase1f_refined_positive_chunk_boundary_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 0,
+			"exact": true,
+			"maximum_channel_delta": 0,
+			"phase1e": "phase1e_refined_positive_chunk_boundary_3_0x.png",
+			"phase1f": "phase1f_refined_positive_chunk_boundary_3_0x.png"
+		},
+		{
+			"different_channel_bytes": 747709,
+			"exact": false,
+			"maximum_channel_delta": 11,
+			"phase1e": "phase1e_refined_shoreline_cliffs_1_0x.png",
+			"phase1f": "phase1f_refined_shoreline_cliffs_1_0x.png"
+		},
+		{
+			"different_channel_bytes": 754571,
+			"exact": false,
+			"maximum_channel_delta": 12,
+			"phase1e": "phase1e_refined_shoreline_cliffs_3_0x.png",
+			"phase1f": "phase1f_refined_shoreline_cliffs_3_0x.png"
+		}
+	]
+}

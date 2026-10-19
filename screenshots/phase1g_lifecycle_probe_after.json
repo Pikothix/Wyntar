@@ -1,0 +1,586 @@
+{
+	"chunk_count": 12,
+	"display_server": "headless",
+	"frames_after_submission": [
+		{
+			"frame_ms": 11.738,
+			"index": 1,
+			"nodes": 599,
+			"pending_retirements": 12,
+			"resources": 38,
+			"static_memory_mib": 62.9067554473877
+		},
+		{
+			"frame_ms": 0.528,
+			"index": 2,
+			"nodes": 591,
+			"pending_retirements": 12,
+			"resources": 38,
+			"static_memory_mib": 62.6571025848389
+		},
+		{
+			"frame_ms": 6.349,
+			"index": 3,
+			"nodes": 583,
+			"pending_retirements": 12,
+			"resources": 38,
+			"static_memory_mib": 62.4807758331299
+		},
+		{
+			"frame_ms": 6.902,
+			"index": 4,
+			"nodes": 575,
+			"pending_retirements": 12,
+			"resources": 38,
+			"static_memory_mib": 62.4048290252686
+		},
+		{
+			"frame_ms": 6.879,
+			"index": 5,
+			"nodes": 570,
+			"pending_retirements": 12,
+			"resources": 38,
+			"static_memory_mib": 62.359899520874
+		},
+		{
+			"frame_ms": 6.907,
+			"index": 6,
+			"nodes": 569,
+			"pending_retirements": 11,
+			"resources": 38,
+			"static_memory_mib": 62.3512210845947
+		},
+		{
+			"frame_ms": 6.866,
+			"index": 7,
+			"nodes": 561,
+			"pending_retirements": 11,
+			"resources": 38,
+			"static_memory_mib": 62.0496120452881
+		},
+		{
+			"frame_ms": 6.912,
+			"index": 8,
+			"nodes": 553,
+			"pending_retirements": 11,
+			"resources": 38,
+			"static_memory_mib": 61.8039493560791
+		},
+		{
+			"frame_ms": 6.871,
+			"index": 9,
+			"nodes": 545,
+			"pending_retirements": 11,
+			"resources": 38,
+			"static_memory_mib": 61.6443309783936
+		},
+		{
+			"frame_ms": 6.871,
+			"index": 10,
+			"nodes": 537,
+			"pending_retirements": 11,
+			"resources": 38,
+			"static_memory_mib": 61.5733814239502
+		},
+		{
+			"frame_ms": 6.909,
+			"index": 11,
+			"nodes": 532,
+			"pending_retirements": 11,
+			"resources": 38,
+			"static_memory_mib": 61.5300312042236
+		},
+		{
+			"frame_ms": 6.877,
+			"index": 12,
+			"nodes": 531,
+			"pending_retirements": 10,
+			"resources": 38,
+			"static_memory_mib": 61.5213527679443
+		},
+		{
+			"frame_ms": 6.913,
+			"index": 13,
+			"nodes": 523,
+			"pending_retirements": 10,
+			"resources": 38,
+			"static_memory_mib": 61.2684116363525
+		},
+		{
+			"frame_ms": 6.868,
+			"index": 14,
+			"nodes": 515,
+			"pending_retirements": 10,
+			"resources": 38,
+			"static_memory_mib": 61.0085201263428
+		},
+		{
+			"frame_ms": 6.949,
+			"index": 15,
+			"nodes": 507,
+			"pending_retirements": 10,
+			"resources": 38,
+			"static_memory_mib": 60.8188800811768
+		},
+		{
+			"frame_ms": 6.85,
+			"index": 16,
+			"nodes": 499,
+			"pending_retirements": 10,
+			"resources": 38,
+			"static_memory_mib": 60.7328090667725
+		},
+		{
+			"frame_ms": 6.87,
+			"index": 17,
+			"nodes": 494,
+			"pending_retirements": 10,
+			"resources": 38,
+			"static_memory_mib": 60.6861629486084
+		},
+		{
+			"frame_ms": 6.912,
+			"index": 18,
+			"nodes": 493,
+			"pending_retirements": 9,
+			"resources": 38,
+			"static_memory_mib": 60.6774845123291
+		},
+		{
+			"frame_ms": 6.867,
+			"index": 19,
+			"nodes": 485,
+			"pending_retirements": 9,
+			"resources": 38,
+			"static_memory_mib": 60.3679180145264
+		},
+		{
+			"frame_ms": 6.894,
+			"index": 20,
+			"nodes": 477,
+			"pending_retirements": 9,
+			"resources": 38,
+			"static_memory_mib": 60.1183338165283
+		},
+		{
+			"frame_ms": 6.91,
+			"index": 21,
+			"nodes": 469,
+			"pending_retirements": 9,
+			"resources": 38,
+			"static_memory_mib": 59.9668254852295
+		},
+		{
+			"frame_ms": 6.866,
+			"index": 22,
+			"nodes": 461,
+			"pending_retirements": 9,
+			"resources": 38,
+			"static_memory_mib": 59.8946323394775
+		},
+		{
+			"frame_ms": 6.91,
+			"index": 23,
+			"nodes": 456,
+			"pending_retirements": 9,
+			"resources": 38,
+			"static_memory_mib": 59.8514194488525
+		},
+		{
+			"frame_ms": 6.873,
+			"index": 24,
+			"nodes": 455,
+			"pending_retirements": 8,
+			"resources": 38,
+			"static_memory_mib": 59.8427410125732
+		},
+		{
+			"frame_ms": 6.907,
+			"index": 25,
+			"nodes": 447,
+			"pending_retirements": 8,
+			"resources": 38,
+			"static_memory_mib": 59.6326999664307
+		},
+		{
+			"frame_ms": 6.879,
+			"index": 26,
+			"nodes": 439,
+			"pending_retirements": 8,
+			"resources": 38,
+			"static_memory_mib": 59.3864421844482
+		},
+		{
+			"frame_ms": 6.883,
+			"index": 27,
+			"nodes": 431,
+			"pending_retirements": 8,
+			"resources": 38,
+			"static_memory_mib": 59.2070484161377
+		},
+		{
+			"frame_ms": 6.916,
+			"index": 28,
+			"nodes": 423,
+			"pending_retirements": 8,
+			"resources": 38,
+			"static_memory_mib": 59.1336421966553
+		},
+		{
+			"frame_ms": 6.866,
+			"index": 29,
+			"nodes": 418,
+			"pending_retirements": 8,
+			"resources": 38,
+			"static_memory_mib": 59.0904521942139
+		},
+		{
+			"frame_ms": 6.909,
+			"index": 30,
+			"nodes": 417,
+			"pending_retirements": 7,
+			"resources": 38,
+			"static_memory_mib": 59.0817737579346
+		},
+		{
+			"frame_ms": 6.879,
+			"index": 31,
+			"nodes": 409,
+			"pending_retirements": 7,
+			"resources": 38,
+			"static_memory_mib": 58.8844814300537
+		},
+		{
+			"frame_ms": 6.882,
+			"index": 32,
+			"nodes": 401,
+			"pending_retirements": 7,
+			"resources": 38,
+			"static_memory_mib": 58.6842441558838
+		},
+		{
+			"frame_ms": 6.905,
+			"index": 33,
+			"nodes": 393,
+			"pending_retirements": 7,
+			"resources": 38,
+			"static_memory_mib": 58.4531993865967
+		},
+		{
+			"frame_ms": 6.876,
+			"index": 34,
+			"nodes": 385,
+			"pending_retirements": 7,
+			"resources": 38,
+			"static_memory_mib": 58.3808155059814
+		},
+		{
+			"frame_ms": 6.908,
+			"index": 35,
+			"nodes": 380,
+			"pending_retirements": 7,
+			"resources": 38,
+			"static_memory_mib": 58.3382434844971
+		},
+		{
+			"frame_ms": 6.878,
+			"index": 36,
+			"nodes": 379,
+			"pending_retirements": 6,
+			"resources": 38,
+			"static_memory_mib": 58.3295650482178
+		},
+		{
+			"frame_ms": 6.905,
+			"index": 37,
+			"nodes": 371,
+			"pending_retirements": 6,
+			"resources": 38,
+			"static_memory_mib": 57.9868183135986
+		},
+		{
+			"frame_ms": 6.875,
+			"index": 38,
+			"nodes": 363,
+			"pending_retirements": 6,
+			"resources": 38,
+			"static_memory_mib": 57.7618236541748
+		},
+		{
+			"frame_ms": 6.886,
+			"index": 39,
+			"nodes": 355,
+			"pending_retirements": 6,
+			"resources": 38,
+			"static_memory_mib": 57.6301746368408
+		},
+		{
+			"frame_ms": 6.909,
+			"index": 40,
+			"nodes": 347,
+			"pending_retirements": 6,
+			"resources": 38,
+			"static_memory_mib": 57.5659084320068
+		},
+		{
+			"frame_ms": 6.873,
+			"index": 41,
+			"nodes": 342,
+			"pending_retirements": 6,
+			"resources": 38,
+			"static_memory_mib": 57.5250759124756
+		},
+		{
+			"frame_ms": 6.91,
+			"index": 42,
+			"nodes": 341,
+			"pending_retirements": 5,
+			"resources": 38,
+			"static_memory_mib": 57.5163974761963
+		},
+		{
+			"frame_ms": 6.872,
+			"index": 43,
+			"nodes": 333,
+			"pending_retirements": 5,
+			"resources": 38,
+			"static_memory_mib": 57.2244853973389
+		},
+		{
+			"frame_ms": 6.889,
+			"index": 44,
+			"nodes": 325,
+			"pending_retirements": 5,
+			"resources": 38,
+			"static_memory_mib": 57.0824375152588
+		},
+		{
+			"frame_ms": 6.912,
+			"index": 45,
+			"nodes": 317,
+			"pending_retirements": 5,
+			"resources": 38,
+			"static_memory_mib": 56.9835338592529
+		},
+		{
+			"frame_ms": 6.871,
+			"index": 46,
+			"nodes": 309,
+			"pending_retirements": 5,
+			"resources": 38,
+			"static_memory_mib": 56.9296054840088
+		},
+		{
+			"frame_ms": 6.914,
+			"index": 47,
+			"nodes": 304,
+			"pending_retirements": 5,
+			"resources": 38,
+			"static_memory_mib": 56.8973331451416
+		},
+		{
+			"frame_ms": 6.866,
+			"index": 48,
+			"nodes": 303,
+			"pending_retirements": 4,
+			"resources": 38,
+			"static_memory_mib": 56.8886547088623
+		},
+		{
+			"frame_ms": 6.912,
+			"index": 49,
+			"nodes": 295,
+			"pending_retirements": 4,
+			"resources": 38,
+			"static_memory_mib": 56.5733432769775
+		},
+		{
+			"frame_ms": 6.873,
+			"index": 50,
+			"nodes": 287,
+			"pending_retirements": 4,
+			"resources": 38,
+			"static_memory_mib": 56.3208293914795
+		},
+		{
+			"frame_ms": 6.893,
+			"index": 51,
+			"nodes": 279,
+			"pending_retirements": 4,
+			"resources": 38,
+			"static_memory_mib": 56.1758060455322
+		},
+		{
+			"frame_ms": 6.901,
+			"index": 52,
+			"nodes": 271,
+			"pending_retirements": 4,
+			"resources": 38,
+			"static_memory_mib": 56.1055736541748
+		},
+		{
+			"frame_ms": 6.869,
+			"index": 53,
+			"nodes": 266,
+			"pending_retirements": 4,
+			"resources": 38,
+			"static_memory_mib": 56.0610103607178
+		},
+		{
+			"frame_ms": 6.918,
+			"index": 54,
+			"nodes": 265,
+			"pending_retirements": 3,
+			"resources": 38,
+			"static_memory_mib": 56.0523319244385
+		},
+		{
+			"frame_ms": 6.871,
+			"index": 55,
+			"nodes": 257,
+			"pending_retirements": 3,
+			"resources": 38,
+			"static_memory_mib": 55.7454891204834
+		},
+		{
+			"frame_ms": 6.879,
+			"index": 56,
+			"nodes": 249,
+			"pending_retirements": 3,
+			"resources": 38,
+			"static_memory_mib": 55.6267337799072
+		},
+		{
+			"frame_ms": 6.909,
+			"index": 57,
+			"nodes": 241,
+			"pending_retirements": 3,
+			"resources": 38,
+			"static_memory_mib": 55.5302562713623
+		},
+		{
+			"frame_ms": 6.868,
+			"index": 58,
+			"nodes": 233,
+			"pending_retirements": 3,
+			"resources": 38,
+			"static_memory_mib": 55.4791889190674
+		},
+		{
+			"frame_ms": 6.909,
+			"index": 59,
+			"nodes": 228,
+			"pending_retirements": 3,
+			"resources": 38,
+			"static_memory_mib": 55.4488620758057
+		},
+		{
+			"frame_ms": 6.878,
+			"index": 60,
+			"nodes": 227,
+			"pending_retirements": 2,
+			"resources": 38,
+			"static_memory_mib": 55.439977645874
+		},
+		{
+			"frame_ms": 6.889,
+			"index": 61,
+			"nodes": 219,
+			"pending_retirements": 2,
+			"resources": 38,
+			"static_memory_mib": 55.1044330596924
+		},
+		{
+			"frame_ms": 6.911,
+			"index": 62,
+			"nodes": 211,
+			"pending_retirements": 2,
+			"resources": 38,
+			"static_memory_mib": 54.9008083343506
+		},
+		{
+			"frame_ms": 6.873,
+			"index": 63,
+			"nodes": 203,
+			"pending_retirements": 2,
+			"resources": 38,
+			"static_memory_mib": 54.7821445465088
+		},
+		{
+			"frame_ms": 6.909,
+			"index": 64,
+			"nodes": 195,
+			"pending_retirements": 2,
+			"resources": 38,
+			"static_memory_mib": 54.7189083099365
+		},
+		{
+			"frame_ms": 6.875,
+			"index": 65,
+			"nodes": 190,
+			"pending_retirements": 2,
+			"resources": 38,
+			"static_memory_mib": 54.6792659759521
+		},
+		{
+			"frame_ms": 6.906,
+			"index": 66,
+			"nodes": 189,
+			"pending_retirements": 1,
+			"resources": 38,
+			"static_memory_mib": 54.6705875396729
+		},
+		{
+			"frame_ms": 6.871,
+			"index": 67,
+			"nodes": 181,
+			"pending_retirements": 1,
+			"resources": 38,
+			"static_memory_mib": 54.5297183990479
+		},
+		{
+			"frame_ms": 6.89,
+			"index": 68,
+			"nodes": 173,
+			"pending_retirements": 1,
+			"resources": 38,
+			"static_memory_mib": 54.3408832550049
+		},
+		{
+			"frame_ms": 6.91,
+			"index": 69,
+			"nodes": 165,
+			"pending_retirements": 1,
+			"resources": 38,
+			"static_memory_mib": 54.1439380645752
+		},
+		{
+			"frame_ms": 6.873,
+			"index": 70,
+			"nodes": 157,
+			"pending_retirements": 1,
+			"resources": 38,
+			"static_memory_mib": 54.0789012908936
+		},
+		{
+			"frame_ms": 7.372,
+			"index": 71,
+			"nodes": 152,
+			"pending_retirements": 1,
+			"resources": 38,
+			"static_memory_mib": 54.0422763824463
+		},
+		{
+			"frame_ms": 6.409,
+			"index": 72,
+			"nodes": 151,
+			"pending_retirements": 0,
+			"resources": 38,
+			"static_memory_mib": 54.0333995819092
+		}
+	],
+	"node_count_before": 607,
+	"queue_free_submission_ms": 2.707,
+	"resource_count_before": 38,
+	"static_memory_before_mib": 81.4463405609131
+}

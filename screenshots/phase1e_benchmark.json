@@ -1,0 +1,54 @@
+{
+	"phase1d": {
+		"average_draw_calls": 0.0,
+		"average_frame_ms": 6.89755555555555,
+		"geometry": {
+			"build_ms": 125.123,
+			"chunks": 12,
+			"edge_components": 2442,
+			"edge_meshes": 36,
+			"face_meshes": 36,
+			"faces": 727,
+			"height_queries": 13872,
+			"material_queries": 13872,
+			"shadow_meshes": 36,
+			"shadows": 723,
+			"triangles": 22640,
+			"vertices": 45280
+		},
+		"p95_frame_ms": 6.925,
+		"p99_frame_ms": 6.951,
+		"static_memory_mib": 75.5146112442017,
+		"toggle_rebuild_ms": 126.676,
+		"worst_frame_ms": 7.003
+	},
+	"phase1e": {
+		"average_draw_calls": 0.0,
+		"average_frame_ms": 6.89781666666666,
+		"geometry": {
+			"build_ms": 115.774,
+			"chunks": 12,
+			"edge_components": 2442,
+			"edge_meshes": 36,
+			"face_meshes": 36,
+			"faces": 727,
+			"height_queries": 13872,
+			"material_queries": 13872,
+			"shadow_meshes": 36,
+			"shadows": 723,
+			"triangles": 16000,
+			"vertices": 28680
+		},
+		"p95_frame_ms": 6.92,
+		"p99_frame_ms": 6.932,
+		"static_memory_mib": 75.2889604568481,
+		"toggle_rebuild_ms": 116.857,
+		"worst_frame_ms": 6.993
+	},
+	"phase1e_edit": {
+		"changed": 1,
+		"dirty_chunks": 1,
+		"elapsed_ms": 11.386,
+		"refresh_ms": 10.711
+	}
+}

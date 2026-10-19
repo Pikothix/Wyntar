@@ -1,0 +1,35 @@
+{
+	"phase2a": {
+		"average_draw_calls": 42.0,
+		"average_frame_ms": 1.051575,
+		"geometry": {
+			"average_build_usec": 36771.875,
+			"chunk_count": 16,
+			"current_average_build_usec": 36771.875,
+			"faces": 1109,
+			"last_build_usec": 37964,
+			"triangles": 135508,
+			"vertices": 156328
+		},
+		"p95_frame_ms": 1.369,
+		"static_memory_mib": 50.9736652374268,
+		"worst_frame_ms": 1.618
+	},
+	"phase2b": {
+		"average_draw_calls": 42.0,
+		"average_frame_ms": 2.21209166666667,
+		"geometry": {
+			"average_build_usec": 60508.84375,
+			"chunk_count": 16,
+			"current_average_build_usec": 84245.8125,
+			"faces": 1109,
+			"last_build_usec": 90601,
+			"triangles": 135508,
+			"vertices": 156328
+		},
+		"p95_frame_ms": 2.792,
+		"static_memory_mib": 50.9755764007568,
+		"toggle_rebuild_ms": 1623.091,
+		"worst_frame_ms": 3.402
+	}
+}
