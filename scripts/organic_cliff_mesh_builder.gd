@@ -8,6 +8,8 @@ const TILE_SIZE := 32
 const HEIGHT_STEP := 16
 const PROFILE_STEP := 16
 const COLUMN_COUNT := TILE_SIZE / PROFILE_STEP
+const CONNECTED_PROFILE_STEP := 8
+const CONNECTED_COLUMN_COUNT := TILE_SIZE / CONNECTED_PROFILE_STEP
 const RETURN_PROFILE_STEP := 8
 const REFINED_RETURN_STEP := 16
 const HALO_MARGIN := 1
@@ -20,7 +22,8 @@ static func build(
 		world_lookup: Callable, height_lookup: Callable,
 		liquid_by_id: Dictionary,
 		unified_components_enabled: bool = false,
-		refined_silhouettes_enabled: bool = false) -> Dictionary:
+		refined_silhouettes_enabled: bool = false,
+		connected_contours_enabled: bool = false) -> Dictionary:
 	var started_usec: int = Time.get_ticks_usec()
 	var sampling_started_usec: int = Time.get_ticks_usec()
 	# One bounded halo read replaces repeated height/material callbacks from the
@@ -40,7 +43,8 @@ static func build(
 	var sampling_usec: int = Time.get_ticks_usec() - sampling_started_usec
 	var state: Dictionary = create_incremental(
 		chunk_coord, max_elevation, world_seed, halo_ids, halo_heights,
-		liquid_by_id, unified_components_enabled, refined_silhouettes_enabled, true)
+		liquid_by_id, unified_components_enabled, refined_silhouettes_enabled,
+		connected_contours_enabled, true)
 	process_incremental(state, CHUNK_SIZE * CHUNK_SIZE)
 	var result: Dictionary = finalize_incremental(state)
 	result.sampling_usec = sampling_usec
@@ -55,6 +59,7 @@ static func create_incremental(
 		halo_ids: PackedInt32Array, halo_heights,
 		liquid_by_id: Dictionary, unified_components_enabled: bool,
 		refined_silhouettes_enabled: bool,
+		connected_contours_enabled: bool = false,
 		profiling_enabled: bool = false) -> Dictionary:
 	## The caller owns the immutable 34x34 snapshot. All mutable state below is
 	## presentation-only and can be discarded safely when a chunk is invalidated.
@@ -67,6 +72,7 @@ static func create_incremental(
 		"liquid_by_id": liquid_by_id,
 		"unified_components_enabled": unified_components_enabled,
 		"refined_silhouettes_enabled": refined_silhouettes_enabled,
+		"connected_contours_enabled": connected_contours_enabled,
 		"profiling_enabled": profiling_enabled,
 		"cell_index": 0,
 		"buffers": {},
@@ -145,6 +151,16 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 		left_connected and west_south_height == south_height)
 	var right_foot_connected: bool = (
 		right_connected and east_south_height == south_height)
+	# Phase 3D only promotes a face into a connected run where its complete
+	# elevation interval agrees with an immediate neighbour. This is symmetric
+	# across chunk seams and deliberately leaves mixed-height junctions,
+	# isolated cells, and narrow corner cases on the Phase 3C profile.
+	var left_run_connected: bool = (
+		left_connected and west_height == owner_height
+		and west_south_height == south_height)
+	var right_run_connected: bool = (
+		right_connected and east_height == owner_height
+		and east_south_height == south_height)
 	if profiling_enabled:
 		state.face_construction_usec += Time.get_ticks_usec() - started_usec
 
@@ -160,6 +176,8 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 			owner_height, south_height, source_id, int(state.world_seed),
 			left_connected, right_connected,
 			west_south_height, west_height, east_south_height, east_height,
+			bool(state.connected_contours_enabled),
+			left_run_connected, right_run_connected,
 			state.profile_metrics)
 		var geometry_elapsed_usec: int = (
 			Time.get_ticks_usec() - geometry_started_usec if profiling_enabled else 0)
@@ -176,7 +194,9 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 			state.triangle_count += _append_contact_shadow(
 				state.shadow_buffers[owner_height], local_x, local_y, world_pos,
 				owner_height, south_height, source_id, int(state.world_seed),
-				left_foot_connected, right_foot_connected, state.profile_metrics)
+				left_foot_connected, right_foot_connected,
+				bool(state.connected_contours_enabled),
+				left_run_connected, right_run_connected, state.profile_metrics)
 			geometry_elapsed_usec = (
 				Time.get_ticks_usec() - geometry_started_usec if profiling_enabled else 0)
 			vertex_elapsed_usec = (
@@ -196,7 +216,8 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 			north_height, west_height, east_height, south_height,
 			int(halo_ids[north_index]), int(halo_ids[west_index]),
 			int(halo_ids[east_index]), bool(state.refined_silhouettes_enabled),
-			left_top_connected, right_top_connected, state.profile_metrics)
+			left_top_connected, right_top_connected,
+			bool(state.connected_contours_enabled), state.profile_metrics)
 		var geometry_elapsed_usec: int = (
 			Time.get_ticks_usec() - geometry_started_usec if profiling_enabled else 0)
 		var vertex_elapsed_usec: int = (
@@ -284,6 +305,8 @@ static func _append_face(
 		left_connected: bool, right_connected: bool,
 		left_minimum: int, left_maximum: int,
 		right_minimum: int, right_maximum: int,
+		connected_contours_enabled: bool,
+		left_run_connected: bool, right_run_connected: bool,
 		profile_metrics: Dictionary) -> Vector2i:
 	var local_left: int = local_x * TILE_SIZE
 	var local_top_base: int = local_y * TILE_SIZE + TILE_SIZE - owner_height * HEIGHT_STEP
@@ -291,14 +314,24 @@ static func _append_face(
 	var world_left: int = world_pos.x * TILE_SIZE
 	var face_height: int = local_bottom_base - local_top_base
 	var row_count: int = maxi(1, ceili(float(face_height) / PROFILE_STEP))
+	var connected_run: bool = (
+		connected_contours_enabled and (left_run_connected or right_run_connected))
+	var column_count: int = CONNECTED_COLUMN_COUNT if connected_run else COLUMN_COUNT
+	var profile_step: int = CONNECTED_PROFILE_STEP if connected_run else PROFILE_STEP
 	var boundary_samples: Array[PackedInt32Array] = []
 	for boundary in range(row_count + 1):
 		var level: int = owner_height - boundary
 		var samples := PackedInt32Array()
-		for column in range(COLUMN_COUNT + 1):
-			var world_x: int = world_left + column * PROFILE_STEP
+		for column in range(column_count + 1):
+			var world_x: int = world_left + column * profile_step
+			var connected_sample: bool = connected_run
+			if column == 0:
+				connected_sample = left_run_connected
+			elif column == column_count:
+				connected_sample = right_run_connected
 			samples.append(_face_level_offset(
-				world_x, world_pos.y, level, world_seed))
+				world_x, world_pos.y, level, world_seed, connected_sample,
+				connected_contours_enabled))
 		boundary_samples.append(samples)
 	var triangles_before: int = buffer.indices.size() / 3
 	for row in range(row_count):
@@ -324,9 +357,9 @@ static func _append_face(
 		var right_below_connected: bool = _face_band_connected(
 			right_connected, right_minimum, right_maximum,
 			band_minimum - 1, band_minimum)
-		for column in range(COLUMN_COUNT):
-			var x00: float = local_left + column * PROFILE_STEP
-			var x10: float = x00 + PROFILE_STEP
+		for column in range(column_count):
+			var x00: float = local_left + column * profile_step
+			var x10: float = x00 + profile_step
 			var x01: float = x00
 			var x11: float = x10
 			if column == 0:
@@ -334,7 +367,7 @@ static func _append_face(
 					x00 += _face_cap_offset(world_pos, t0, world_seed, true)
 				if not left_row_connected and not left_below_connected:
 					x01 += _face_cap_offset(world_pos, t1, world_seed, true)
-			if column == COLUMN_COUNT - 1:
+			if column == column_count - 1:
 				if not right_row_connected and not right_above_connected:
 					x10 += _face_cap_offset(world_pos, t0, world_seed, false)
 				if not right_row_connected and not right_below_connected:
@@ -389,6 +422,7 @@ static func _append_edge_components(
 		east_height: int, south_height: int, north_id: int, west_id: int,
 		east_id: int, refined_silhouettes_enabled: bool,
 		left_connected: bool, right_connected: bool,
+		connected_contours_enabled: bool,
 		profile_metrics: Dictionary) -> Vector2i:
 	var component_count: int = 0
 	var triangles_before: int = buffer.indices.size() / 3
@@ -406,7 +440,7 @@ static func _append_edge_components(
 			_append_refined_side_return(
 				buffer, local_x, local_y, world_pos, owner_height,
 				west_height, south_height, west_source, world_seed, true,
-				left_connected, profile_metrics)
+				left_connected, connected_contours_enabled, profile_metrics)
 		else:
 			_append_side_return(
 				buffer, local_x, local_y, world_pos, owner_height,
@@ -419,7 +453,7 @@ static func _append_edge_components(
 			_append_refined_side_return(
 				buffer, local_x, local_y, world_pos, owner_height,
 				east_height, south_height, east_source, world_seed, false,
-				right_connected, profile_metrics)
+				right_connected, connected_contours_enabled, profile_metrics)
 		else:
 			_append_side_return(
 				buffer, local_x, local_y, world_pos, owner_height,
@@ -494,7 +528,8 @@ static func _append_refined_side_return(
 		buffer: Dictionary, local_x: int, local_y: int, world_pos: Vector2i,
 		owner_height: int, neighbor_height: int, south_height: int,
 		source_id: int, world_seed: int, west_side: bool,
-		neighbor_face_connected: bool, profile_metrics: Dictionary) -> void:
+		neighbor_face_connected: bool, connected_contours_enabled: bool,
+		profile_metrics: Dictionary) -> void:
 	## Phase 1E uses a coherent world-space ribbon rather than independent
 	## eight-pixel rectangles. Its last sample is snapped to the owning south
 	## face cap and grows a tapered shoulder into that wall when one exists.
@@ -520,7 +555,8 @@ static func _append_refined_side_return(
 				boundary_x, world_pos, face_height, world_seed,
 				west_side, neighbor_face_connected)
 			y += _face_level_offset(
-				world_boundary_x, world_pos.y, owner_height, world_seed)
+				world_boundary_x, world_pos.y, owner_height, world_seed,
+				false, connected_contours_enabled)
 			# Preserve a readable joint without turning every corner into a
 			# rectangular buttress.
 			width = maxi(width, 3 + drop / 2)
@@ -619,24 +655,34 @@ static func _append_contact_shadow(
 		buffer: Dictionary, local_x: int, local_y: int, world_pos: Vector2i,
 		owner_height: int, south_height: int, source_id: int, world_seed: int,
 		left_connected: bool, right_connected: bool,
+		connected_contours_enabled: bool,
+		left_run_connected: bool, right_run_connected: bool,
 		profile_metrics: Dictionary) -> int:
 	var local_left: int = local_x * TILE_SIZE
 	var local_bottom_base: int = local_y * TILE_SIZE + TILE_SIZE - south_height * HEIGHT_STEP
 	var world_left: int = world_pos.x * TILE_SIZE
 	var triangles_before: int = buffer.indices.size() / 3
-	for column in range(COLUMN_COUNT):
-		var world_x0: int = world_left + column * PROFILE_STEP
-		var world_x1: int = world_x0 + PROFILE_STEP
-		var x0: int = local_left + column * PROFILE_STEP
-		var x1: int = x0 + PROFILE_STEP
+	var connected_run: bool = (
+		connected_contours_enabled and (left_run_connected or right_run_connected))
+	var column_count: int = CONNECTED_COLUMN_COUNT if connected_run else COLUMN_COUNT
+	var profile_step: int = CONNECTED_PROFILE_STEP if connected_run else PROFILE_STEP
+	for column in range(column_count):
+		var world_x0: int = world_left + column * profile_step
+		var world_x1: int = world_x0 + profile_step
+		var x0: int = local_left + column * profile_step
+		var x1: int = x0 + profile_step
 		if column == 0 and not left_connected:
 			x0 += roundi(_face_cap_offset(world_pos, 1.0, world_seed, true))
-		if column == COLUMN_COUNT - 1 and not right_connected:
+		if column == column_count - 1 and not right_connected:
 			x1 += roundi(_face_cap_offset(world_pos, 1.0, world_seed, false))
 		var y0: int = local_bottom_base + _face_level_offset(
-			world_x0, world_pos.y, south_height, world_seed)
+			world_x0, world_pos.y, south_height, world_seed,
+			connected_run and (column > 0 or left_run_connected),
+			connected_contours_enabled)
 		var y1: int = local_bottom_base + _face_level_offset(
-			world_x1, world_pos.y, south_height, world_seed)
+			world_x1, world_pos.y, south_height, world_seed,
+			connected_run and (column < column_count - 1 or right_run_connected),
+			connected_contours_enabled)
 		var depth0: int = 3 + posmod(_hash_int(
 			world_x0 / PROFILE_STEP, world_pos.y + 1, south_height,
 			world_seed, 61), 3)
@@ -695,11 +741,55 @@ static func _face_cap_offset(
 
 
 static func _face_level_offset(
-		world_pixel_x: int, world_cell_y: int, level: int, world_seed: int) -> int:
+		world_pixel_x: int, world_cell_y: int, level: int, world_seed: int,
+		connected_run: bool = false,
+		connected_contours_enabled: bool = false) -> int:
 	## A level boundary is independent of the total drop on either adjacent
 	## face. Clamping inward preserves coverage beneath authoritative top tiles.
+	if connected_run:
+		return _connected_contour_offset(
+			world_pixel_x, world_cell_y, level, world_seed)
+	if connected_contours_enabled:
+		return _conservative_contour_offset(
+			world_pixel_x, world_cell_y, level, world_seed)
 	return mini(0, outline_offset(
 		world_pixel_x, world_cell_y, level, world_seed, 83))
+
+
+static func _connected_contour_offset(
+		world_pixel_x: int, world_cell_y: int, level: int, world_seed: int) -> int:
+	## Two bounded linear fields create formation-scale mass and a smaller rock
+	## edge without a spline overshoot. All anchors are absolute world samples;
+	## a chunk needs no run history beyond its immutable one-cell halo.
+	var broad: float = _interpolated_contour_noise(
+		world_pixel_x, 96, world_cell_y, level, world_seed, 113, 7)
+	var fine: float = _interpolated_contour_noise(
+		world_pixel_x, 24, world_cell_y, level, world_seed, 131, 3)
+	return clampi(roundi(-1.0 - broad * 0.72 - fine * 0.45), -7, 0)
+
+
+static func _conservative_contour_offset(
+		world_pixel_x: int, world_cell_y: int, level: int, world_seed: int) -> int:
+	## Short runs and complex corners share the same formation field at a
+	## reduced envelope. This breaks tile cadence without giving small shapes
+	## the mass reserved for compatible multi-cell runs.
+	var broad: float = _interpolated_contour_noise(
+		world_pixel_x, 96, world_cell_y, level, world_seed, 113, 7)
+	var fine: float = _interpolated_contour_noise(
+		world_pixel_x, 24, world_cell_y, level, world_seed, 131, 3)
+	return clampi(roundi(-broad * 0.32 - fine * 0.18), -3, 0)
+
+
+static func _interpolated_contour_noise(
+		world_pixel_x: int, spacing: int, world_cell_y: int, level: int,
+		world_seed: int, channel: int, value_count: int) -> float:
+	var anchor: int = floori(float(world_pixel_x) / spacing)
+	var fraction: float = float(posmod(world_pixel_x, spacing)) / float(spacing)
+	var first: float = float(posmod(_hash_int(
+		anchor, world_cell_y, level, world_seed, channel), value_count))
+	var second: float = float(posmod(_hash_int(
+		anchor + 1, world_cell_y, level, world_seed, channel), value_count))
+	return lerpf(first, second, fraction)
 
 
 static func _facet_shade(

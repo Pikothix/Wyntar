@@ -8,3 +8,4 @@ procedural_cliff_materials_enabled = true
 organic_cliff_geometry_enabled = true
 unified_cliff_components_enabled = true
 refined_cliff_silhouettes_enabled = true
+connected_cliff_contours_enabled = true

@@ -45,6 +45,7 @@ var _decorations_visible: bool = true
 var _organic_cliff_geometry_enabled: bool = false
 var _unified_cliff_components_enabled: bool = false
 var _refined_cliff_silhouettes_enabled: bool = false
+var _connected_cliff_contours_enabled: bool = false
 var _cliff_edge_overlays_visible: bool = true
 var _cliff_shadows_visible: bool = true
 var _organic_cliff_world_seed: int = 0
@@ -90,6 +91,7 @@ func configure(
         organic_cliff_geometry_enabled: bool,
         unified_cliff_components_enabled: bool,
         refined_cliff_silhouettes_enabled: bool,
+        connected_cliff_contours_enabled: bool,
         organic_cliff_world_seed: int,
         organic_cliff_material: Material,
         initial_max_elevation: int = 0) -> void:
@@ -111,6 +113,7 @@ func configure(
     _organic_cliff_geometry_enabled = organic_cliff_geometry_enabled
     _unified_cliff_components_enabled = unified_cliff_components_enabled
     _refined_cliff_silhouettes_enabled = refined_cliff_silhouettes_enabled
+    _connected_cliff_contours_enabled = connected_cliff_contours_enabled
     _organic_cliff_world_seed = organic_cliff_world_seed
     _organic_cliff_material = organic_cliff_material
     position = Vector2(coord * CHUNK_SIZE * TILE_SIZE)
@@ -300,10 +303,13 @@ func rebuild_organic_cliffs() -> void:
     _update_cliff_component_visibility()
     if not _organic_cliff_geometry_enabled:
         return
+    # Synchronous rebuilds are retained for direct/test callers and use the
+    # same Phase 3D mode as scheduled builds.
     var result: Dictionary = OrganicCliffMeshBuilder.build(
         chunk_coord, MAX_ELEVATION, _organic_cliff_world_seed,
         _world_lookup, _height_lookup, liquid_by_id,
-        _unified_cliff_components_enabled, _refined_cliff_silhouettes_enabled)
+        _unified_cliff_components_enabled, _refined_cliff_silhouettes_enabled,
+        _connected_cliff_contours_enabled)
     organic_cliff_geometry_usec = int(result.build_usec)
     organic_cliff_face_count = int(result.face_count)
     organic_cliff_vertex_count = int(result.vertex_count)
@@ -399,6 +405,13 @@ func set_refined_cliff_silhouettes_enabled(enabled: bool) -> void:
     mark_organic_cliff_geometry_pending()
 
 
+func set_connected_cliff_contours_enabled(enabled: bool) -> void:
+    if _connected_cliff_contours_enabled == enabled:
+        return
+    _connected_cliff_contours_enabled = enabled
+    mark_organic_cliff_geometry_pending()
+
+
 func set_cliff_edge_overlays_visible(visible_value: bool) -> void:
     _cliff_edge_overlays_visible = visible_value
     _update_cliff_component_visibility()
@@ -419,6 +432,10 @@ func is_unified_cliff_components_enabled() -> bool:
 
 func is_refined_cliff_silhouettes_enabled() -> bool:
     return _refined_cliff_silhouettes_enabled
+
+
+func is_connected_cliff_contours_enabled() -> bool:
+    return _connected_cliff_contours_enabled
 
 
 func get_organic_cliff_geometry_stats() -> Dictionary:

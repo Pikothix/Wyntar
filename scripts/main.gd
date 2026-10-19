@@ -58,6 +58,7 @@ const DEMO_CENTER: Vector2 = Vector2(16.0, 16.0)
 @export var organic_cliff_geometry_enabled: bool = true
 @export var unified_cliff_components_enabled: bool = true
 @export var refined_cliff_silhouettes_enabled: bool = true
+@export var connected_cliff_contours_enabled: bool = true
 
 @export_group("Experimental 2.5D Presentation")
 @export var oblique_presentation_enabled: bool = false
@@ -161,6 +162,7 @@ func _ready() -> void:
 	terrain.organic_cliff_geometry_enabled = organic_cliff_geometry_enabled
 	terrain.unified_cliff_components_enabled = unified_cliff_components_enabled
 	terrain.refined_cliff_silhouettes_enabled = refined_cliff_silhouettes_enabled
+	terrain.connected_cliff_contours_enabled = connected_cliff_contours_enabled
 	terrain.oblique_presentation_enabled = oblique_presentation_enabled
 	terrain.organic_oblique_refinement_enabled = organic_oblique_refinement_enabled
 	terrain.cliff_edge_overlays_visible = cliff_edge_overlays_visible
@@ -619,6 +621,7 @@ func _replace_world_from_snapshot(snapshot: Dictionary) -> Dictionary:
 	replacement.organic_cliff_geometry_enabled = organic_cliff_geometry_enabled
 	replacement.unified_cliff_components_enabled = unified_cliff_components_enabled
 	replacement.refined_cliff_silhouettes_enabled = refined_cliff_silhouettes_enabled
+	replacement.connected_cliff_contours_enabled = connected_cliff_contours_enabled
 	replacement.oblique_presentation_enabled = oblique_presentation_enabled
 	replacement.organic_oblique_refinement_enabled = organic_oblique_refinement_enabled
 	replacement.cliff_edge_overlays_visible = cliff_edge_overlays_visible

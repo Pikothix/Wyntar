@@ -1,0 +1,313 @@
+{
+	"capture_label": "baseline",
+	"captures": [
+		{
+			"camera_cell": [
+				0,
+				0
+			],
+			"camera_world": [
+				16.0,
+				16.0
+			],
+			"path": "res://screenshots/phase3d_baseline_natural_gameplay_0_5x.png",
+			"scenario": "natural_gameplay",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				0,
+				0
+			],
+			"camera_world": [
+				16.0,
+				16.0
+			],
+			"path": "res://screenshots/phase3d_baseline_natural_gameplay_1_0x.png",
+			"scenario": "natural_gameplay",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				0,
+				0
+			],
+			"camera_world": [
+				16.0,
+				16.0
+			],
+			"path": "res://screenshots/phase3d_baseline_natural_gameplay_3_0x.png",
+			"scenario": "natural_gameplay",
+			"zoom": 3.0
+		},
+		{
+			"camera_cell": [
+				16384,
+				8192
+			],
+			"camera_world": [
+				524304.0,
+				262160.0
+			],
+			"path": "res://screenshots/phase3d_baseline_positive_seam_diagonal_0_5x.png",
+			"scenario": "positive_seam_diagonal",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				16384,
+				8192
+			],
+			"camera_world": [
+				524304.0,
+				262160.0
+			],
+			"path": "res://screenshots/phase3d_baseline_positive_seam_diagonal_1_0x.png",
+			"scenario": "positive_seam_diagonal",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				16384,
+				8192
+			],
+			"camera_world": [
+				524304.0,
+				262160.0
+			],
+			"path": "res://screenshots/phase3d_baseline_positive_seam_diagonal_3_0x.png",
+			"scenario": "positive_seam_diagonal",
+			"zoom": 3.0
+		},
+		{
+			"camera_cell": [
+				16480,
+				8192
+			],
+			"camera_world": [
+				527376.0,
+				262160.0
+			],
+			"path": "res://screenshots/phase3d_baseline_winding_convex_concave_0_5x.png",
+			"scenario": "winding_convex_concave",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				16480,
+				8192
+			],
+			"camera_world": [
+				527376.0,
+				262160.0
+			],
+			"path": "res://screenshots/phase3d_baseline_winding_convex_concave_1_0x.png",
+			"scenario": "winding_convex_concave",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				16480,
+				8192
+			],
+			"camera_world": [
+				527376.0,
+				262160.0
+			],
+			"path": "res://screenshots/phase3d_baseline_winding_convex_concave_3_0x.png",
+			"scenario": "winding_convex_concave",
+			"zoom": 3.0
+		},
+		{
+			"camera_cell": [
+				16576,
+				8192
+			],
+			"camera_world": [
+				530448.0,
+				262160.0
+			],
+			"path": "res://screenshots/phase3d_baseline_materials_three_level_shoreline_0_5x.png",
+			"scenario": "materials_three_level_shoreline",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				16576,
+				8192
+			],
+			"camera_world": [
+				530448.0,
+				262160.0
+			],
+			"path": "res://screenshots/phase3d_baseline_materials_three_level_shoreline_1_0x.png",
+			"scenario": "materials_three_level_shoreline",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				16576,
+				8192
+			],
+			"camera_world": [
+				530448.0,
+				262160.0
+			],
+			"path": "res://screenshots/phase3d_baseline_materials_three_level_shoreline_3_0x.png",
+			"scenario": "materials_three_level_shoreline",
+			"zoom": 3.0
+		},
+		{
+			"camera_cell": [
+				16672,
+				8192
+			],
+			"camera_world": [
+				533520.0,
+				262160.0
+			],
+			"path": "res://screenshots/phase3d_baseline_isolated_raised_formation_0_5x.png",
+			"scenario": "isolated_raised_formation",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				16672,
+				8192
+			],
+			"camera_world": [
+				533520.0,
+				262160.0
+			],
+			"path": "res://screenshots/phase3d_baseline_isolated_raised_formation_1_0x.png",
+			"scenario": "isolated_raised_formation",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				16672,
+				8192
+			],
+			"camera_world": [
+				533520.0,
+				262160.0
+			],
+			"path": "res://screenshots/phase3d_baseline_isolated_raised_formation_3_0x.png",
+			"scenario": "isolated_raised_formation",
+			"zoom": 3.0
+		},
+		{
+			"camera_cell": [
+				-16384,
+				-8192
+			],
+			"camera_world": [
+				-524272.0,
+				-262128.0
+			],
+			"path": "res://screenshots/phase3d_baseline_negative_seam_diagonal_0_5x.png",
+			"scenario": "negative_seam_diagonal",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				-16384,
+				-8192
+			],
+			"camera_world": [
+				-524272.0,
+				-262128.0
+			],
+			"path": "res://screenshots/phase3d_baseline_negative_seam_diagonal_1_0x.png",
+			"scenario": "negative_seam_diagonal",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				-16384,
+				-8192
+			],
+			"camera_world": [
+				-524272.0,
+				-262128.0
+			],
+			"path": "res://screenshots/phase3d_baseline_negative_seam_diagonal_3_0x.png",
+			"scenario": "negative_seam_diagonal",
+			"zoom": 3.0
+		}
+	],
+	"connected_cliff_contours": false,
+	"display_server": "Windows",
+	"engine": "4.7-stable (official)",
+	"fixture_size_cells": [
+		58,
+		36
+	],
+	"phase": "3D",
+	"scenarios": [
+		{
+			"center_cell": [
+				0,
+				0
+			],
+			"description": "Unmodified generated terrain with normal decorations and objects.",
+			"kind": "generated",
+			"label": "natural_gameplay"
+		},
+		{
+			"center_cell": [
+				16384,
+				8192
+			],
+			"description": "Long stone diagonal crossing positive X/Y chunk boundaries.",
+			"kind": "controlled",
+			"label": "positive_seam_diagonal"
+		},
+		{
+			"center_cell": [
+				16480,
+				8192
+			],
+			"description": "S-shaped dirt boundary with paired convex spur and concave notch.",
+			"kind": "controlled",
+			"label": "winding_convex_concave"
+		},
+		{
+			"center_cell": [
+				16576,
+				8192
+			],
+			"description": "Broad three-level dirt and stone drops meeting a water shoreline.",
+			"kind": "controlled",
+			"label": "materials_three_level_shoreline"
+		},
+		{
+			"center_cell": [
+				16672,
+				8192
+			],
+			"description": "Small isolated stone formation with one-, two-, and three-level faces.",
+			"kind": "controlled",
+			"label": "isolated_raised_formation"
+		},
+		{
+			"center_cell": [
+				-16384,
+				-8192
+			],
+			"description": "Long dirt diagonal crossing negative X/Y chunk boundaries.",
+			"kind": "controlled",
+			"label": "negative_seam_diagonal"
+		}
+	],
+	"viewport": [
+		1280,
+		720
+	],
+	"world_seed": 84521,
+	"zooms": [
+		0.5,
+		1.0,
+		3.0
+	]
+}
