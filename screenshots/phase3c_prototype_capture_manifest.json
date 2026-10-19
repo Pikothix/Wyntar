@@ -1,0 +1,133 @@
+{
+	"capture_label": "prototype",
+	"captures": [
+		{
+			"components": "all_components",
+			"path": "res://screenshots/phase3c_prototype_grey_wedge_reproduction_1_0x_all_components.png",
+			"scenario": "grey_wedge_reproduction",
+			"zoom": 1.0
+		},
+		{
+			"components": "all_components",
+			"path": "res://screenshots/phase3c_prototype_grey_wedge_reproduction_3_0x_all_components.png",
+			"scenario": "grey_wedge_reproduction",
+			"zoom": 3.0
+		},
+		{
+			"components": "all_components",
+			"path": "res://screenshots/phase3c_prototype_convex_concave_corners_1_0x_all_components.png",
+			"scenario": "convex_concave_corners",
+			"zoom": 1.0
+		},
+		{
+			"components": "all_components",
+			"path": "res://screenshots/phase3c_prototype_convex_concave_corners_3_0x_all_components.png",
+			"scenario": "convex_concave_corners",
+			"zoom": 3.0
+		},
+		{
+			"components": "all_components",
+			"path": "res://screenshots/phase3c_prototype_isolated_one_two_three_1_0x_all_components.png",
+			"scenario": "isolated_one_two_three",
+			"zoom": 1.0
+		},
+		{
+			"components": "all_components",
+			"path": "res://screenshots/phase3c_prototype_isolated_one_two_three_3_0x_all_components.png",
+			"scenario": "isolated_one_two_three",
+			"zoom": 3.0
+		},
+		{
+			"components": "all_components",
+			"path": "res://screenshots/phase3c_prototype_adjacent_dirt_stone_1_0x_all_components.png",
+			"scenario": "adjacent_dirt_stone",
+			"zoom": 1.0
+		},
+		{
+			"components": "all_components",
+			"path": "res://screenshots/phase3c_prototype_adjacent_dirt_stone_3_0x_all_components.png",
+			"scenario": "adjacent_dirt_stone",
+			"zoom": 3.0
+		},
+		{
+			"components": "all_components",
+			"path": "res://screenshots/phase3c_prototype_positive_chunk_boundaries_1_0x_all_components.png",
+			"scenario": "positive_chunk_boundaries",
+			"zoom": 1.0
+		},
+		{
+			"components": "all_components",
+			"path": "res://screenshots/phase3c_prototype_positive_chunk_boundaries_3_0x_all_components.png",
+			"scenario": "positive_chunk_boundaries",
+			"zoom": 3.0
+		},
+		{
+			"components": "all_components",
+			"path": "res://screenshots/phase3c_prototype_negative_chunk_boundaries_1_0x_all_components.png",
+			"scenario": "negative_chunk_boundaries",
+			"zoom": 1.0
+		},
+		{
+			"components": "all_components",
+			"path": "res://screenshots/phase3c_prototype_negative_chunk_boundaries_3_0x_all_components.png",
+			"scenario": "negative_chunk_boundaries",
+			"zoom": 3.0
+		},
+		{
+			"components": "no_contact_shadow",
+			"path": "res://screenshots/phase3c_prototype_grey_wedge_reproduction_3_0x_no_contact_shadow.png",
+			"scenario": "grey_wedge_reproduction",
+			"zoom": 3.0
+		},
+		{
+			"components": "no_lips_or_returns",
+			"path": "res://screenshots/phase3c_prototype_grey_wedge_reproduction_3_0x_no_lips_or_returns.png",
+			"scenario": "grey_wedge_reproduction",
+			"zoom": 3.0
+		}
+	],
+	"display_server": "Windows",
+	"engine": "4.7.2-stable (official)",
+	"phase": "3C",
+	"scenarios": [
+		{
+			"center": "(18048, 9024)",
+			"description": "Tall dirt and stone corners with asymmetric drops matching reported wedges.",
+			"label": "grey_wedge_reproduction"
+		},
+		{
+			"center": "(18144, 9024)",
+			"description": "Explicit convex spurs and concave notches in dirt and stone plateaus.",
+			"label": "convex_concave_corners"
+		},
+		{
+			"center": "(18240, 9024)",
+			"description": "Isolated one-, two-, and three-level formations.",
+			"label": "isolated_one_two_three"
+		},
+		{
+			"center": "(18336, 9024)",
+			"description": "Adjacent dirt and stone walls with crossed lower shelves.",
+			"label": "adjacent_dirt_stone"
+		},
+		{
+			"center": "(18432, 9216)",
+			"description": "Corner and return strips crossing positive X and Y chunk boundaries.",
+			"label": "positive_chunk_boundaries"
+		},
+		{
+			"center": "(-18432, -9216)",
+			"description": "Corner and return strips crossing negative X and Y chunk boundaries.",
+			"label": "negative_chunk_boundaries"
+		}
+	],
+	"viewport": [
+		1280,
+		720
+	],
+	"world_seed": 84521,
+	"zooms": [
+		1.0,
+		3.0
+	]
+}

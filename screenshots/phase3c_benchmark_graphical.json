@@ -1,0 +1,48 @@
+{
+	"display_server": "Windows",
+	"engine": "4.7.2-stable (official)",
+	"fixture": "phase1g_dense_exact",
+	"frames_per_run": 240,
+	"gpu": "NVIDIA GeForce RTX 3080",
+	"mean_chunk_cpu_ms": 458.232,
+	"mean_geometry_cpu_ms": 145.567666666667,
+	"renderer": "gl_compatibility",
+	"run_mean_ms": [
+		6.97595,
+		6.26709583333333,
+		6.489075,
+		6.4166375,
+		7.03538333333333
+	],
+	"runs": 5,
+	"steady": {
+		"average_draw_calls": 609.0,
+		"average_primitives": 8302.0,
+		"mean_frame_ms": 6.63682833333334,
+		"median_frame_ms": 6.531,
+		"p95_frame_ms": 8.803,
+		"worst_frame_ms": 39.253
+	},
+	"stream_runs": [
+		{
+			"chunk_cpu_ms": 452.512,
+			"frames": 188,
+			"geometry_cpu_ms": 145.893
+		},
+		{
+			"chunk_cpu_ms": 463.796,
+			"frames": 189,
+			"geometry_cpu_ms": 141.823
+		},
+		{
+			"chunk_cpu_ms": 458.388,
+			"frames": 189,
+			"geometry_cpu_ms": 148.987
+		}
+	],
+	"viewport": [
+		1280,
+		720
+	],
+	"warmup_frames": 180
+}

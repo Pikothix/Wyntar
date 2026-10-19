@@ -125,14 +125,26 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 	var south_height: int = int(halo_heights[south_index])
 	var west_height: int = int(halo_heights[west_index])
 	var east_height: int = int(halo_heights[east_index])
+	var west_south_height: int = int(halo_heights[west_index + HALO_SIZE])
+	var east_south_height: int = int(halo_heights[east_index + HALO_SIZE])
 	var left_connected: bool = _has_face_values(
 		int(halo_ids[west_index]), west_height,
-		int(halo_heights[west_index + HALO_SIZE]),
+		west_south_height,
 		south_height, owner_height, liquid_by_id)
 	var right_connected: bool = _has_face_values(
 		int(halo_ids[east_index]), east_height,
-		int(halo_heights[east_index + HALO_SIZE]),
+		east_south_height,
 		south_height, owner_height, liquid_by_id)
+	var left_top_connected: bool = _face_band_connected(
+		left_connected, west_south_height, west_height,
+		owner_height - 1, owner_height)
+	var right_top_connected: bool = _face_band_connected(
+		right_connected, east_south_height, east_height,
+		owner_height - 1, owner_height)
+	var left_foot_connected: bool = (
+		left_connected and west_south_height == south_height)
+	var right_foot_connected: bool = (
+		right_connected and east_south_height == south_height)
 	if profiling_enabled:
 		state.face_construction_usec += Time.get_ticks_usec() - started_usec
 
@@ -146,7 +158,9 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 		var result: Vector2i = _append_face(
 			state.buffers[owner_height], local_x, local_y, world_pos,
 			owner_height, south_height, source_id, int(state.world_seed),
-			left_connected, right_connected, state.profile_metrics)
+			left_connected, right_connected,
+			west_south_height, west_height, east_south_height, east_height,
+			state.profile_metrics)
 		var geometry_elapsed_usec: int = (
 			Time.get_ticks_usec() - geometry_started_usec if profiling_enabled else 0)
 		var vertex_elapsed_usec: int = (
@@ -162,7 +176,7 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 			state.triangle_count += _append_contact_shadow(
 				state.shadow_buffers[owner_height], local_x, local_y, world_pos,
 				owner_height, south_height, source_id, int(state.world_seed),
-				left_connected, right_connected, state.profile_metrics)
+				left_foot_connected, right_foot_connected, state.profile_metrics)
 			geometry_elapsed_usec = (
 				Time.get_ticks_usec() - geometry_started_usec if profiling_enabled else 0)
 			vertex_elapsed_usec = (
@@ -182,7 +196,7 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 			north_height, west_height, east_height, south_height,
 			int(halo_ids[north_index]), int(halo_ids[west_index]),
 			int(halo_ids[east_index]), bool(state.refined_silhouettes_enabled),
-			left_connected, right_connected, state.profile_metrics)
+			left_top_connected, right_top_connected, state.profile_metrics)
 		var geometry_elapsed_usec: int = (
 			Time.get_ticks_usec() - geometry_started_usec if profiling_enabled else 0)
 		var vertex_elapsed_usec: int = (
@@ -268,55 +282,73 @@ static func _append_face(
 		buffer: Dictionary, local_x: int, local_y: int, world_pos: Vector2i,
 		owner_height: int, south_height: int, source_id: int, world_seed: int,
 		left_connected: bool, right_connected: bool,
+		left_minimum: int, left_maximum: int,
+		right_minimum: int, right_maximum: int,
 		profile_metrics: Dictionary) -> Vector2i:
 	var local_left: int = local_x * TILE_SIZE
 	var local_top_base: int = local_y * TILE_SIZE + TILE_SIZE - owner_height * HEIGHT_STEP
 	var local_bottom_base: int = local_y * TILE_SIZE + TILE_SIZE - south_height * HEIGHT_STEP
 	var world_left: int = world_pos.x * TILE_SIZE
-	var top_samples := PackedInt32Array()
-	var bottom_samples := PackedInt32Array()
-	for column in range(COLUMN_COUNT + 1):
-		var world_x: int = world_left + column * PROFILE_STEP
-		# Top samples only extend under the authoritative surface; this prevents
-		# a procedural outline from opening a gap below an unchanged top tile.
-		top_samples.append(mini(0, outline_offset(
-			world_x, world_pos.y, owner_height, world_seed, 0)))
-		bottom_samples.append(outline_offset(
-			world_x, world_pos.y + 1, south_height, world_seed, 1))
-
 	var face_height: int = local_bottom_base - local_top_base
 	var row_count: int = maxi(1, ceili(float(face_height) / PROFILE_STEP))
+	var boundary_samples: Array[PackedInt32Array] = []
+	for boundary in range(row_count + 1):
+		var level: int = owner_height - boundary
+		var samples := PackedInt32Array()
+		for column in range(COLUMN_COUNT + 1):
+			var world_x: int = world_left + column * PROFILE_STEP
+			samples.append(_face_level_offset(
+				world_x, world_pos.y, level, world_seed))
+		boundary_samples.append(samples)
 	var triangles_before: int = buffer.indices.size() / 3
 	for row in range(row_count):
 		var t0: float = float(row) / row_count
 		var t1: float = float(row + 1) / row_count
+		var band_maximum: int = owner_height - row
+		var band_minimum: int = band_maximum - 1
+		var left_row_connected: bool = _face_band_connected(
+			left_connected, left_minimum, left_maximum,
+			band_minimum, band_maximum)
+		var right_row_connected: bool = _face_band_connected(
+			right_connected, right_minimum, right_maximum,
+			band_minimum, band_maximum)
+		var left_above_connected: bool = _face_band_connected(
+			left_connected, left_minimum, left_maximum,
+			band_maximum, band_maximum + 1)
+		var right_above_connected: bool = _face_band_connected(
+			right_connected, right_minimum, right_maximum,
+			band_maximum, band_maximum + 1)
+		var left_below_connected: bool = _face_band_connected(
+			left_connected, left_minimum, left_maximum,
+			band_minimum - 1, band_minimum)
+		var right_below_connected: bool = _face_band_connected(
+			right_connected, right_minimum, right_maximum,
+			band_minimum - 1, band_minimum)
 		for column in range(COLUMN_COUNT):
-			var x0: float = local_left + column * PROFILE_STEP
-			var x1: float = x0 + PROFILE_STEP
-			if column == 0 and not left_connected:
-				x0 += _cap_offset(world_pos, t0, world_seed, 2)
-			if column == COLUMN_COUNT - 1 and not right_connected:
-				x1 += _cap_offset(world_pos, t0, world_seed, 3)
-			var y00: float = lerpf(
-				local_top_base + top_samples[column],
-				local_bottom_base + bottom_samples[column], t0)
-			var y10: float = lerpf(
-				local_top_base + top_samples[column + 1],
-				local_bottom_base + bottom_samples[column + 1], t0)
-			var y01: float = lerpf(
-				local_top_base + top_samples[column],
-				local_bottom_base + bottom_samples[column], t1)
-			var y11: float = lerpf(
-				local_top_base + top_samples[column + 1],
-				local_bottom_base + bottom_samples[column + 1], t1)
-			if column == 0 and not left_connected:
-				x0 += _cap_offset(world_pos, t1, world_seed, 4) * t1
-			if column == COLUMN_COUNT - 1 and not right_connected:
-				x1 += _cap_offset(world_pos, t1, world_seed, 5) * t1
+			var x00: float = local_left + column * PROFILE_STEP
+			var x10: float = x00 + PROFILE_STEP
+			var x01: float = x00
+			var x11: float = x10
+			if column == 0:
+				if not left_row_connected and not left_above_connected:
+					x00 += _face_cap_offset(world_pos, t0, world_seed, true)
+				if not left_row_connected and not left_below_connected:
+					x01 += _face_cap_offset(world_pos, t1, world_seed, true)
+			if column == COLUMN_COUNT - 1:
+				if not right_row_connected and not right_above_connected:
+					x10 += _face_cap_offset(world_pos, t0, world_seed, false)
+				if not right_row_connected and not right_below_connected:
+					x11 += _face_cap_offset(world_pos, t1, world_seed, false)
+			var row_top: int = local_y * TILE_SIZE + TILE_SIZE - band_maximum * HEIGHT_STEP
+			var row_bottom: int = row_top + HEIGHT_STEP
+			var y00: float = row_top + boundary_samples[row][column]
+			var y10: float = row_top + boundary_samples[row][column + 1]
+			var y01: float = row_bottom + boundary_samples[row + 1][column]
+			var y11: float = row_bottom + boundary_samples[row + 1][column + 1]
 			var shade: float = _facet_shade(world_pos, column, row, source_id, world_seed)
 			_append_quad(
-				buffer, Vector2(x0, y00), Vector2(x1, y10),
-				Vector2(x1, y11), Vector2(x0, y01), shade, source_id,
+				buffer, Vector2(x00, y00), Vector2(x10, y10),
+				Vector2(x11, y11), Vector2(x01, y01), shade, source_id,
 				_hash_int(world_pos.x * 4 + column, world_pos.y * 4 + row,
 					owner_height, world_seed, source_id) & 1, 0, 1.0,
 				profile_metrics)
@@ -487,8 +519,8 @@ static func _append_refined_side_return(
 			outer_x = _face_top_cap_x(
 				boundary_x, world_pos, face_height, world_seed,
 				west_side, neighbor_face_connected)
-			y += mini(0, outline_offset(
-				world_boundary_x, world_pos.y, owner_height, world_seed, 0))
+			y += _face_level_offset(
+				world_boundary_x, world_pos.y, owner_height, world_seed)
 			# Preserve a readable joint without turning every corner into a
 			# rectangular buttress.
 			width = maxi(width, 3 + drop / 2)
@@ -574,18 +606,13 @@ static func _return_width(
 
 
 static func _face_top_cap_x(
-		boundary_x: int, world_pos: Vector2i, face_height: int,
+		boundary_x: int, world_pos: Vector2i, _face_height: int,
 		world_seed: int, west_side: bool,
 		neighbor_face_connected: bool) -> int:
 	if neighbor_face_connected:
 		return boundary_x
-	var row_count: int = maxi(1, ceili(float(face_height) / PROFILE_STEP))
-	var next_fraction: float = 1.0 / row_count
-	if west_side:
-		return boundary_x + _cap_offset(world_pos, 0.0, world_seed, 2) + roundi(
-			_cap_offset(world_pos, next_fraction, world_seed, 4) * next_fraction)
-	return boundary_x + _cap_offset(world_pos, 0.0, world_seed, 3) + roundi(
-		_cap_offset(world_pos, next_fraction, world_seed, 5) * next_fraction)
+	return boundary_x + roundi(_face_cap_offset(
+		world_pos, 0.0, world_seed, west_side))
 
 
 static func _append_contact_shadow(
@@ -594,11 +621,8 @@ static func _append_contact_shadow(
 		left_connected: bool, right_connected: bool,
 		profile_metrics: Dictionary) -> int:
 	var local_left: int = local_x * TILE_SIZE
-	var local_top_base: int = local_y * TILE_SIZE + TILE_SIZE - owner_height * HEIGHT_STEP
 	var local_bottom_base: int = local_y * TILE_SIZE + TILE_SIZE - south_height * HEIGHT_STEP
 	var world_left: int = world_pos.x * TILE_SIZE
-	var row_count: int = maxi(1, ceili(float(local_bottom_base - local_top_base) / PROFILE_STEP))
-	var previous_row_fraction: float = float(row_count - 1) / row_count
 	var triangles_before: int = buffer.indices.size() / 3
 	for column in range(COLUMN_COUNT):
 		var world_x0: int = world_left + column * PROFILE_STEP
@@ -606,15 +630,13 @@ static func _append_contact_shadow(
 		var x0: int = local_left + column * PROFILE_STEP
 		var x1: int = x0 + PROFILE_STEP
 		if column == 0 and not left_connected:
-			x0 += _cap_offset(world_pos, previous_row_fraction, world_seed, 2)
-			x0 += _cap_offset(world_pos, 1.0, world_seed, 4)
+			x0 += roundi(_face_cap_offset(world_pos, 1.0, world_seed, true))
 		if column == COLUMN_COUNT - 1 and not right_connected:
-			x1 += _cap_offset(world_pos, previous_row_fraction, world_seed, 3)
-			x1 += _cap_offset(world_pos, 1.0, world_seed, 5)
-		var y0: int = local_bottom_base + outline_offset(
-			world_x0, world_pos.y + 1, south_height, world_seed, 1)
-		var y1: int = local_bottom_base + outline_offset(
-			world_x1, world_pos.y + 1, south_height, world_seed, 1)
+			x1 += roundi(_face_cap_offset(world_pos, 1.0, world_seed, false))
+		var y0: int = local_bottom_base + _face_level_offset(
+			world_x0, world_pos.y, south_height, world_seed)
+		var y1: int = local_bottom_base + _face_level_offset(
+			world_x1, world_pos.y, south_height, world_seed)
 		var depth0: int = 3 + posmod(_hash_int(
 			world_x0 / PROFILE_STEP, world_pos.y + 1, south_height,
 			world_seed, 61), 3)
@@ -637,6 +659,14 @@ static func _has_face_values(
 	return maxi(minimum_level, neighbor_minimum) < mini(maximum_level, neighbor_maximum)
 
 
+static func _face_band_connected(
+		neighbor_connected: bool, neighbor_minimum: int, neighbor_maximum: int,
+		band_minimum: int, band_maximum: int) -> bool:
+	return (neighbor_connected
+		and maxi(band_minimum, neighbor_minimum)
+		< mini(band_maximum, neighbor_maximum))
+
+
 static func _cliff_source_for(terrain_id: int, shoreline: bool) -> int:
 	# Kept identical to the legacy cliff source mapping. The mesh builder no
 	# longer depends on TerrainChunkBuildJob, so that job can own this builder's
@@ -650,6 +680,26 @@ static func _cap_offset(
 	var row: int = roundi(fraction * 8.0)
 	return posmod(_hash_int(
 		world_pos.x, world_pos.y, row, world_seed, channel), 5) - 2
+
+
+static func _face_cap_offset(
+		world_pos: Vector2i, fraction: float, world_seed: int,
+		west_side: bool) -> float:
+	## Both vertices on a row boundary must evaluate the same absolute cap
+	## position. Mixing the next row's taper into both endpoints opens wedges
+	## between independently emitted row quads.
+	var primary_channel: int = 2 if west_side else 3
+	var taper_channel: int = 4 if west_side else 5
+	return (_cap_offset(world_pos, fraction, world_seed, primary_channel)
+		+ _cap_offset(world_pos, fraction, world_seed, taper_channel) * fraction)
+
+
+static func _face_level_offset(
+		world_pixel_x: int, world_cell_y: int, level: int, world_seed: int) -> int:
+	## A level boundary is independent of the total drop on either adjacent
+	## face. Clamping inward preserves coverage beneath authoritative top tiles.
+	return mini(0, outline_offset(
+		world_pixel_x, world_cell_y, level, world_seed, 83))
 
 
 static func _facet_shade(
