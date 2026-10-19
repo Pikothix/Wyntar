@@ -13,6 +13,9 @@ uniform bool contact_shadow = false;
 uniform bool geometry_mesh = false;
 uniform bool combined_geometry = false;
 uniform vec2 seed_offset = vec2(0.0);
+// Reserved for camera integration. Broad planes and beds remain at every LOD;
+// only cracks and fine weathering respond to this value.
+uniform float detail_level : hint_range(0.0, 1.0) = 1.0;
 
 varying vec2 world_position;
 
@@ -35,18 +38,41 @@ float smooth_value_noise(vec2 point) {
 }
 
 
-float facet_field(vec2 point) {
-	// Two rotated box lattices make stable, irregular regions without Voronoi
-	// loops. Coordinates are absolute, so the regions cross chunk boundaries.
-	vec2 first = vec2(
-		point.x * 0.079 + point.y * 0.047,
-		-point.x * 0.039 + point.y * 0.091);
-	vec2 second = vec2(
-		point.x * 0.121 - point.y * 0.063,
-		point.x * 0.052 + point.y * 0.108) + vec2(17.0, 31.0);
-	float a = hash_value(floor(first));
-	float b = hash_value(floor(second));
-	return fract(a + b * 0.61803398875);
+float broad_facet_field(vec2 point) {
+	// Large rotated plane groups replace the previous dense box-cell pattern.
+	// The irregular rotation keeps the low-cost lattice from following tiles.
+	vec2 plane_space = vec2(
+		point.x * 0.017 + point.y * 0.010,
+		-point.x * 0.008 + point.y * 0.019);
+	return hash_value(floor(plane_space) + seed_offset * 0.11);
+}
+
+
+float geological_crack(vec2 point) {
+	// One short, bent fracture and an occasional branch exist in each selected
+	// large absolute-world cell. Line distances avoid neighbourhood searches and
+	// remain identical when a fracture crosses a terrain chunk boundary.
+	vec2 cell_size = vec2(112.0, 96.0);
+	vec2 cell = floor(point / cell_size);
+	float selection = hash_value(cell + seed_offset * 0.07 + vec2(41.0, 13.0));
+	vec2 local = point - cell * cell_size;
+	float shape = hash_value(cell + seed_offset * 0.17 + vec2(23.0, 5.0));
+	float bend = hash_value(cell + seed_offset * 0.23 + vec2(61.0, 47.0));
+	float principal_x = mix(27.0, 85.0, shape);
+	principal_x += (bend - 0.5) * 0.46 * (local.y - 12.0);
+	principal_x += (shape - 0.5) * 13.0 * step(43.0, local.y);
+	float vertical_gate = step(9.0, local.y) * step(local.y, mix(55.0, 76.0, bend));
+	float selected_gate = step(0.79, selection);
+	float thickness = mix(0.65, 1.15, shape);
+	float principal = 1.0 - smoothstep(
+		thickness, thickness + 0.85, abs(local.x - principal_x));
+
+	float branch_y = local.y - 43.0;
+	float branch_x = principal_x + (shape - 0.5) * 1.25 * branch_y;
+	float branch_gate = step(0.91, selection) * step(0.0, branch_y) * step(branch_y, 17.0);
+	float branch = 1.0 - smoothstep(
+		thickness * 0.7, thickness * 0.7 + 0.85, abs(local.x - branch_x));
+	return max(principal * vertical_gate, branch * branch_gate) * selected_gate;
 }
 
 
@@ -104,45 +130,74 @@ void fragment() {
 
 		float macro = smooth_value_noise(pixel * 0.018 + seed_offset);
 		float fine = smooth_value_noise(pixel * 0.071 + seed_offset * 0.37);
-		float facet = facet_field(pixel + seed_offset * 5.0) - 0.5;
+		float facet = broad_facet_field(pixel + seed_offset * 5.0) - 0.5;
 
-		// Bands use absolute world Y and a broad X warp. They therefore continue
-		// through adjacent tiles and vertically stacked cliff segments.
+		// Beds use absolute coordinates, a slowly changing thickness and rare
+		// deterministic offsets. Break noise removes short portions without
+		// restarting the layer at a tile or chunk edge.
 		float warp = (smooth_value_noise(
-			vec2(pixel.x * 0.018, pixel.y * 0.003) + seed_offset * 0.13) - 0.5) * 5.5;
-		float band_coordinate = (pixel.y + warp) / (fragment_stone ? 10.5 : 13.0);
-		float band_distance = abs(fract(band_coordinate) - 0.5);
-		float band = 1.0 - smoothstep(0.055, 0.19, band_distance);
-		float band_identity = hash_value(
-			vec2(floor(band_coordinate), floor(pixel.x / 192.0)));
-		float strata = band * mix(0.035, 0.105, band_identity);
+			vec2(pixel.x * 0.012, pixel.y * 0.002) + seed_offset * 0.13) - 0.5) * 8.0;
+		float thickness_region = floor((pixel.x + 53.0) / 176.0);
+		float thickness_field = hash_value(
+			vec2(thickness_region, 19.0) + seed_offset * 0.09);
+		float layer_thickness = mix(
+			fragment_stone ? 11.0 : 14.0,
+			fragment_stone ? 17.0 : 21.0, thickness_field);
+		float fault_region = floor((pixel.x + 37.0) / 144.0);
+		float fault_seed = hash_value(
+			vec2(fault_region, 73.0) + seed_offset * 0.19);
+		float fault_offset = step(0.82, fault_seed) * (fault_seed - 0.82) * 38.0;
+		float band_coordinate = (pixel.y + warp + fault_offset) / layer_thickness;
+		float band_index = floor(band_coordinate);
+		float band_distance = min(fract(band_coordinate), 1.0 - fract(band_coordinate));
+		float band = 1.0 - smoothstep(0.045, 0.145, band_distance);
+		float break_field = hash_value(vec2(
+			floor((pixel.x + 19.0) / 88.0), band_index * 0.71) + seed_offset * 0.41);
+		band *= step(0.19, break_field);
+		float bed_identity = hash_value(
+			vec2(band_index, 101.0) + seed_offset * 0.27) - 0.5;
 
 		float tone = 0.5 + (macro - 0.5) * 0.34 + (fine - 0.5) * 0.14;
-		float facet_strength = 0.14;
-		float strata_strength = 0.58;
+		float facet_strength = 0.13;
+		float strata_strength = 0.045;
 		if (fragment_stone) {
-			facet_strength = 0.48;
-			strata_strength = 1.0;
+			facet_strength = 0.43;
+			strata_strength = 0.105;
 		}
 		tone += facet * facet_strength;
-		tone -= strata * strata_strength;
+		tone += bed_identity * (fragment_stone ? 0.085 : 0.035);
+		tone -= band * strata_strength;
 		float ramp = five_step_ramp(tone);
 
-		// Broad damp variation complements the existing contact-shadow atlas row;
-		// it never uses tile-local Y, so internal stack boundaries stay invisible.
-		float weather = smooth_value_noise(
-			vec2(pixel.x * 0.011, pixel.y * 0.006) + seed_offset * 0.23);
-		pigment *= ramp * mix(0.95, 1.025, weather);
+		// The source art remains micrograin while world-space planes and beds carry
+		// the primary form read. Reuse the macro field for weathering so the added
+		// geological hierarchy does not multiply fragment-noise cost.
+		float weather = macro;
+		float weather_strength = mix(0.0, 1.0, detail_level);
+		pigment *= ramp * mix(0.965, 1.02, mix(0.5, weather, weather_strength));
+
+		if (fragment_stone && geometry_role == 0) {
+			float crack = geological_crack(pixel + seed_offset * 3.0) * detail_level;
+			vec3 fracture_tone = vec3(0.20, 0.235, 0.26);
+			pigment = mix(pigment, fracture_tone, crack * 0.58);
+		} else if (!fragment_stone && geometry_role == 0) {
+			float streak_field = fine * 0.72 + macro * 0.28;
+			float erosion_streak = smoothstep(0.72, 0.94, streak_field) * detail_level;
+			pigment *= 1.0 - erosion_streak * 0.065;
+		}
 
 		if (fragment_shoreline) {
-			float wetness = 0.14 + (1.0 - weather) * 0.10;
-			pigment = mix(pigment, vec3(0.48, 0.61, 0.60), wetness);
-			pigment *= 0.94;
+			float wet_patch = smoothstep(0.47, 0.78, 1.0 - weather);
+			float wetness = 0.045 + wet_patch * 0.095;
+			pigment = mix(pigment, vec3(0.40, 0.52, 0.54), wetness);
+			pigment *= mix(0.97, 0.93, wet_patch);
 		}
 		if (combined_geometry && geometry_role == 1) {
-			// A compact upper ramp lets the generated lip read as the same rock
-			// mass catching light, rather than a separate painted border.
-			pigment *= mix(0.96, 1.08, smoothstep(0.35, 0.75, fine));
+			// The existing 3-5 px lip is the crest accent. Keeping it dark brown
+			// rather than black separates the upper surface without outlining every
+			// internal facet.
+			pigment = mix(pigment, vec3(0.19, 0.17, 0.145), 0.16);
+			pigment *= mix(0.94, 1.02, smoothstep(0.35, 0.75, fine));
 		} else if (combined_geometry && geometry_role == 2) {
 			// Side returns use the same strata field but turn slightly away from
 			// the notional top-left light.
