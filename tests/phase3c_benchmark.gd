@@ -2,7 +2,7 @@ extends "res://tests/phase1g_benchmark.gd"
 ## Phase 3C steady rendering and incremental rebuild check using the exact
 ## Phase 1G dense fixture used by the accepted Phase 3B.1 measurement.
 
-const OUTPUT_PATH := "res://screenshots/phase3c_benchmark_graphical.json"
+const OUTPUT_PATH := "res://.artifacts/phase3c_benchmark_graphical.json"
 const RUN_COUNT := 5
 const FRAMES_PER_RUN := 240
 

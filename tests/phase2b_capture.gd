@@ -2,7 +2,7 @@ extends SceneTree
 ## Identical-seed Phase 2A/2B comparisons for natural gameplay terrain and a
 ## deterministic multi-material, multi-chunk geometry fixture.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const ObliqueProjection = preload("res://scripts/oblique_projection.gd")
 
 var demo

@@ -2,7 +2,7 @@ extends SceneTree
 ## Reproducible Phase 6A visual matrix and enabled/disabled performance route.
 ## Temporary fixture overrides live only for this process.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const ZOOMS: Array[float] = [0.5, 1.0, 3.0]
 
 var _demo

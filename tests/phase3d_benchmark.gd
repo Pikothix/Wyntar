@@ -1,7 +1,7 @@
 extends "res://tests/phase1g_benchmark.gd"
 ## Paired Phase 3C/3D graphical benchmark on the accepted dense fixture.
 
-const OUTPUT_PATH := "res://screenshots/phase3d_benchmark_graphical.json"
+const OUTPUT_PATH := "res://.artifacts/phase3d_benchmark_graphical.json"
 const RUNS := 3
 const STEADY_FRAMES := 240
 

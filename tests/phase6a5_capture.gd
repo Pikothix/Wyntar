@@ -21,16 +21,16 @@ func _run() -> void:
     _demo.compact_hud_enabled = true
     _demo._apply_hud_mode()
     await _capture(
-        "res://screenshots/phase6a5_compact_hud_1x.png",
+        "res://.artifacts/phase6a5_compact_hud_1x.png",
         Vector2(Vector2i(228, 202) * _terrain.TILE_SIZE), 1.0)
     await _capture(
-        "res://screenshots/phase6a5_readability_shore_3x.png",
+        "res://.artifacts/phase6a5_readability_shore_3x.png",
         Vector2(Vector2i(230, 202) * _terrain.TILE_SIZE), 3.0)
 
     _demo.compact_hud_enabled = false
     _demo._apply_hud_mode()
     await _capture(
-        "res://screenshots/phase6a5_expanded_hud_1x.png",
+        "res://.artifacts/phase6a5_expanded_hud_1x.png",
         Vector2(Vector2i(228, 202) * _terrain.TILE_SIZE), 1.0)
     print("PHASE6A5_GRAPHICAL_CAPTURE PASS")
     quit(0)

@@ -1,7 +1,7 @@
 extends SceneTree
 ## Deterministic rendered/F6 evidence for Phase 7C.3 island editing and cliffs.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const VIEW_SIZE := Vector2i(80, 48)
 const EditorController = preload("res://scripts/world_editor_controller.gd")
 

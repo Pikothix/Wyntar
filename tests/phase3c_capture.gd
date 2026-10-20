@@ -2,7 +2,7 @@ extends SceneTree
 ## Controlled Phase 3C corner/return comparison. The same fixtures and camera
 ## path are used for the pre-correction baseline and corrected prototype.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const FIXTURE_SIZE := Vector2i(44, 28)
 const ZOOMS: Array[float] = [1.0, 3.0]
 

@@ -2,7 +2,7 @@ extends SceneTree
 ## Phase 2A four-mode comparison using identical logical targets. Natural
 ## captures retain gameplay UI/detail; fixture captures isolate geometry.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const ObliqueProjection = preload("res://scripts/oblique_projection.gd")
 
 const MODES: Array[Dictionary] = [

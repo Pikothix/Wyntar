@@ -3,21 +3,21 @@ extends SceneTree
 ## 1E fixtures. Geometry equivalence is validated separately from animated or
 ## renderer-sensitive raster differences.
 
-const OUTPUT_PATH := "res://screenshots/phase1f_visual_comparison.json"
+const OUTPUT_PATH := "res://.artifacts/phase1f_visual_comparison.json"
 
 
 func _initialize() -> void:
-	var directory := DirAccess.open("res://screenshots")
+	var directory := DirAccess.open("res://.artifacts")
 	var results: Array[Dictionary] = []
 	var exact_matches: int = 0
 	for file_name in directory.get_files():
 		if not file_name.begins_with("phase1f_") or not file_name.ends_with(".png"):
 			continue
 		var baseline_name: String = file_name.replace("phase1f_", "phase1e_")
-		if not FileAccess.file_exists("res://screenshots/%s" % baseline_name):
+		if not FileAccess.file_exists("res://.artifacts/%s" % baseline_name):
 			continue
-		var current := Image.load_from_file("res://screenshots/%s" % file_name)
-		var baseline := Image.load_from_file("res://screenshots/%s" % baseline_name)
+		var current := Image.load_from_file("res://.artifacts/%s" % file_name)
+		var baseline := Image.load_from_file("res://.artifacts/%s" % baseline_name)
 		var current_bytes: PackedByteArray = current.get_data()
 		var baseline_bytes: PackedByteArray = baseline.get_data()
 		var different_bytes: int = 0

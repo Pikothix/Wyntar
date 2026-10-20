@@ -2,7 +2,7 @@ extends SceneTree
 ## Graphical evidence for designation, removal, inventory credit and berry
 ## ripe/unripe presentation using the real interaction and completion APIs.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 
 var demo
 var terrain

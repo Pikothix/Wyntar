@@ -12,3 +12,16 @@ Thumbs.db
 # Editor settings
 .vscode/
 .idea/
+
+# Generated validation evidence (keep directory markers for Godot scanning rules)
+/screenshots/*
+!/screenshots/.gdignore
+/.artifacts/*
+!/.artifacts/.gdignore
+
+# Local Codex/Godot validation state
+/.codex_appdata/
+/.codex_godot_appdata/
+
+# Root-level validation logs
+/*.log

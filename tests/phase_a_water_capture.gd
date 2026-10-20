@@ -2,7 +2,7 @@ extends SceneTree
 ## Phase A matched visual matrix. Every mode uses the same authored fixtures,
 ## viewport, camera, seed, zoom, and fixed shader animation time.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const FIXTURE_SIZE := Vector2i(104, 64)
 const FIXED_TIME := 6.0
 

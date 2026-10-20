@@ -1,7 +1,7 @@
 extends "res://tests/phase3e_benchmark.gd"
 ## Matched graphical benchmark for all Phase 3F height profiles.
 
-const PHASE3F_OUTPUT_PATH := "res://screenshots/phase3f_benchmark_graphical.json"
+const PHASE3F_OUTPUT_PATH := "res://.artifacts/phase3f_benchmark_graphical.json"
 const TerrainRenderer = preload("res://scripts/terrain_renderer.gd")
 
 

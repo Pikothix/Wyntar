@@ -2,7 +2,7 @@ extends "res://tests/phase1g_benchmark.gd"
 ## Controlled same-session comparison of the pre-3B and current cliff shaders.
 ## Both shaders are compiled and warmed before ten alternating measured runs.
 
-const OUTPUT_PATH := "res://screenshots/phase3b1_shader_benchmark_graphical.json"
+const OUTPUT_PATH := "res://.artifacts/phase3b1_shader_benchmark_graphical.json"
 const BASELINE_SHADER := preload(
 	"res://tests/fixtures/phase3b_pre_geological_cliff.gdshader")
 const PROTOTYPE_SHADER := preload("res://shaders/cliff_procedural.gdshader")
@@ -308,7 +308,7 @@ func _capture_fractional_pan(center: Vector2i) -> void:
 
 func _save_frame(file_name: String) -> void:
 	var image: Image = root.get_texture().get_image()
-	if image == null or image.save_png("res://screenshots/%s" % file_name) != OK:
+	if image == null or image.save_png("res://.artifacts/%s" % file_name) != OK:
 		push_error("Could not save Phase 3B.1 frame %s" % file_name)
 		quit(1)
 

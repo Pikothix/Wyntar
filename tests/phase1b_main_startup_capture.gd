@@ -3,7 +3,7 @@ extends SceneTree
 ## cliff feature flag. Terrain remains authoritative; this script only observes
 ## the presentation nodes produced by the normal gameplay scene.
 
-const OUTPUT_PATH := "res://screenshots/phase1b_normal_gameplay_enabled.png"
+const OUTPUT_PATH := "res://.artifacts/phase1b_normal_gameplay_enabled.png"
 
 var demo
 var terrain

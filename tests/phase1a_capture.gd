@@ -2,7 +2,7 @@ extends SceneTree
 ## Phase 1A before/after visual acceptance fixtures. The same authoritative
 ## cells are captured with only the shared cliff material flag changed.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const FIXTURE_SIZE := Vector2i(46, 28)
 
 var demo

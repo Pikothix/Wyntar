@@ -74,7 +74,7 @@ func _run() -> void:
 		"phase1g_baseline": phase1g_baseline,
 	}
 	var suffix: String = "headless" if DisplayServer.get_name() == "headless" else "graphical"
-	var output_path: String = "res://screenshots/phase3a_benchmark_%s.json" % suffix
+	var output_path: String = "res://.artifacts/phase3a_benchmark_%s.json" % suffix
 	var file := FileAccess.open(output_path, FileAccess.WRITE)
 	file.store_string(JSON.stringify(result, "\t"))
 	file.close()
@@ -146,7 +146,7 @@ func _aggregate(samples: Array[Dictionary]) -> Dictionary:
 
 func _read_phase1g_baseline() -> Dictionary:
 	var suffix: String = "headless" if DisplayServer.get_name() == "headless" else "graphical"
-	var path: String = "res://screenshots/phase1g_benchmark_%s.json" % suffix
+	var path: String = "res://.artifacts/phase1g_benchmark_%s.json" % suffix
 	if not FileAccess.file_exists(path):
 		return {}
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))

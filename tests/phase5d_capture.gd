@@ -2,7 +2,7 @@ extends SceneTree
 ## Graphical Phase 5D evidence and reproducible streaming benchmark. This test
 ## owns only temporary in-process overrides; production persistence is untouched.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const ZOOMS: Array[float] = [0.5, 1.0, 3.0]
 
 var _demo

@@ -2,7 +2,7 @@ extends SceneTree
 ## Reproducible Phase 6B visual matrix. Fixture overrides exist only in this
 ## process and do not alter the project scene or persistence model.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const ZOOMS: Array[float] = [0.5, 1.0, 3.0]
 
 var _demo

@@ -52,7 +52,7 @@ func _run() -> void:
 			continue
 		await _capture_scenario(scenario)
 	var suffix: String = "_" + arguments[1] if arguments.size() > 1 else ""
-	var file := FileAccess.open("res://screenshots/phase3g_%s%s_manifest.json" % [capture_label, suffix], FileAccess.WRITE)
+	var file := FileAccess.open("res://.artifacts/phase3g_%s%s_manifest.json" % [capture_label, suffix], FileAccess.WRITE)
 	file.store_string(JSON.stringify({
 		"seed": terrain.world_seed, "viewport": [1280, 720],
 		"height_step": terrain.get_cliff_height_step(),
@@ -76,6 +76,6 @@ func _capture_scenario(scenario: Dictionary) -> void:
 		var file_name := "phase3g_%s_%s_%s.png" % [
 			capture_label, scenario.label, _zoom_label(zoom)]
 		await _save(file_name)
-		captures.append({"path": "res://screenshots/" + file_name,
+		captures.append({"path": "res://.artifacts/" + file_name,
 			"scenario": scenario.label, "zoom": zoom,
 			"camera_world": _vector_to_array(demo.camera.position)})

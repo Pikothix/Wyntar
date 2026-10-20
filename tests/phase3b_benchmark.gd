@@ -2,8 +2,8 @@ extends "res://tests/phase1g_benchmark.gd"
 ## Reuses the exact Phase 1G fixture and sampling sequence, but preserves the
 ## Phase 1G evidence by writing Phase 3B-specific output paths.
 
-const PHASE3B_OUTPUT_PATH_HEADLESS := "res://screenshots/phase3b_benchmark_headless.json"
-const PHASE3B_OUTPUT_PATH_GRAPHICAL := "res://screenshots/phase3b_benchmark_graphical.json"
+const PHASE3B_OUTPUT_PATH_HEADLESS := "res://.artifacts/phase3b_benchmark_headless.json"
+const PHASE3B_OUTPUT_PATH_GRAPHICAL := "res://.artifacts/phase3b_benchmark_graphical.json"
 
 
 func _run() -> void:

@@ -2,7 +2,7 @@ extends SceneTree
 ## Phase 7C.5 visual acceptance matrix at 1x and 3x. Each scenario emits a
 ## normal frame plus a diagnostic frame that separates geometry from shadows.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const VIEW_SIZE := Vector2i(58, 36)
 const GeometryOverlay = preload("res://tests/phase7c5_geometry_overlay.gd")
 

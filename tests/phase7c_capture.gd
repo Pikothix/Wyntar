@@ -2,7 +2,7 @@ extends SceneTree
 ## Phase 7C deterministic visual matrix. Run against the Phase 7B.1 baseline
 ## and the current project with the same prefix to obtain identical views.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const VIEW_SIZE := Vector2i(96, 56)
 
 var demo

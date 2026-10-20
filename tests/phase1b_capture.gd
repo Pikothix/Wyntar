@@ -2,7 +2,7 @@ extends SceneTree
 ## Phase 1B comparison matrix. "Before" is the retained Phase 1A TileMap
 ## geometry; "after" enables the experimental chunk-batched cliff mesh.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const FIXTURE_SIZE := Vector2i(48, 30)
 
 var demo

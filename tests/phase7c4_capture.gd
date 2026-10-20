@@ -2,7 +2,7 @@ extends SceneTree
 ## Matched Phase 7C.4 geometry showcase at 1x and 3x. Pass `before` or
 ## `after` as the first user argument to preserve comparable evidence.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const VIEW_SIZE := Vector2i(64, 40)
 const GeometryOverlay = preload("res://tests/phase7c4_geometry_overlay.gd")
 

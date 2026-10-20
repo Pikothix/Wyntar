@@ -2,7 +2,7 @@ extends SceneTree
 ## Phase 3A family showcase plus identical procedural/legacy gameplay framing.
 
 const ProcTrees = preload("res://scripts/procgen/proc_trees.gd")
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 
 var demo
 var terrain

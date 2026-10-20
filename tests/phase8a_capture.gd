@@ -2,7 +2,7 @@ extends SceneTree
 ## Repeatable Phase 8A comparison captures. The first two cameras match the
 ## Phase 6B baseline fixtures; the gallery shows every integrated archetype.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 
 var demo
 var terrain

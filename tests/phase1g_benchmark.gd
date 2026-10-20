@@ -1,8 +1,8 @@
 extends SceneTree
 ## Repeated Phase 1G streaming, retirement, mode-switch and edit benchmark.
 
-const OUTPUT_PATH_HEADLESS := "res://screenshots/phase1g_benchmark_headless.json"
-const OUTPUT_PATH_GRAPHICAL := "res://screenshots/phase1g_benchmark_graphical.json"
+const OUTPUT_PATH_HEADLESS := "res://.artifacts/phase1g_benchmark_headless.json"
+const OUTPUT_PATH_GRAPHICAL := "res://.artifacts/phase1g_benchmark_graphical.json"
 
 var demo
 var terrain

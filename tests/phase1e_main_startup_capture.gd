@@ -2,7 +2,7 @@ extends SceneTree
 ## Verifies that normal main.tscn startup selects the refined Phase 1E path
 ## without a capture-only toggle and records the ordinary gameplay view.
 
-const OUTPUT_PATH := "res://screenshots/phase1e_main_startup_1_0x.png"
+const OUTPUT_PATH := "res://.artifacts/phase1e_main_startup_1_0x.png"
 
 var demo
 var terrain

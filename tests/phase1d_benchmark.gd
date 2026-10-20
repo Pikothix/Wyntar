@@ -1,7 +1,7 @@
 extends SceneTree
 ## Reproducible Phase 1B/1D comparison on identical top-down terrain data.
 
-const OUTPUT_PATH := "res://screenshots/phase1d_benchmark.json"
+const OUTPUT_PATH := "res://.artifacts/phase1d_benchmark.json"
 const SAMPLE_FRAMES := 120
 
 var demo

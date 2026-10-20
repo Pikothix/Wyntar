@@ -2,7 +2,7 @@ extends SceneTree
 ## Reproducible Phase 1F streaming, mode-switch and editing benchmark using the
 ## same dense cliff fixture as Phase 1E.
 
-const OUTPUT_PATH := "res://screenshots/phase1f_benchmark.json"
+const OUTPUT_PATH := "res://.artifacts/phase1f_benchmark.json"
 const SAMPLE_FRAMES := 180
 
 var demo
@@ -80,9 +80,9 @@ func _run() -> void:
 	}
 	var encoded: String = JSON.stringify(result, "\t")
 	var specific_path: String = (
-		"res://screenshots/phase1f_benchmark_headless.json"
+		"res://.artifacts/phase1f_benchmark_headless.json"
 		if DisplayServer.get_name() == "headless"
-		else "res://screenshots/phase1f_benchmark_graphical.json")
+		else "res://.artifacts/phase1f_benchmark_graphical.json")
 	for output_path in [OUTPUT_PATH, specific_path]:
 		var file := FileAccess.open(output_path, FileAccess.WRITE)
 		if file == null:

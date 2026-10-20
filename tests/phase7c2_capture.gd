@@ -1,7 +1,7 @@
 extends SceneTree
 ## Deterministic Phase 7C.2 comparison matrix for cliff shape treatment.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const VIEW_SIZE := Vector2i(96, 56)
 
 var demo

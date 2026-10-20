@@ -2,7 +2,7 @@ extends SceneTree
 ## Phase 3B deterministic geological-cliff comparison matrix. Run with the
 ## user argument `baseline` before shader changes and `prototype` afterwards.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const FIXTURE_SIZE := Vector2i(58, 36)
 const ZOOMS: Array[float] = [0.5, 1.0, 3.0]
 

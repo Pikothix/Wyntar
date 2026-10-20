@@ -2,7 +2,7 @@ extends SceneTree
 ## Isolates synchronous retirement submission from Godot's deferred scene-tree
 ## and resource release. This probe intentionally performs no replacement build.
 
-const OUTPUT_PATH := "res://screenshots/phase1g_lifecycle_probe_after.json"
+const OUTPUT_PATH := "res://.artifacts/phase1g_lifecycle_probe_after.json"
 
 var demo
 var terrain

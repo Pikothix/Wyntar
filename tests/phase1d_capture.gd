@@ -2,7 +2,7 @@ extends SceneTree
 ## Phase 1D visual matrix. Both modes keep Phase 1B faces active; "before"
 ## retains legacy edge/shadow atlases and "after" uses unified mesh batches.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const FIXTURE_SIZE := Vector2i(48, 30)
 
 var demo

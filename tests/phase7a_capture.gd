@@ -2,7 +2,7 @@ extends SceneTree
 ## Reproducible Phase 7A captures of the toolbar, logical footprints,
 ## elevation sculpting, and the visible result of an undo transaction.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const EditorController = preload("res://scripts/world_editor_controller.gd")
 
 var demo

@@ -2,7 +2,7 @@ extends SceneTree
 ## Phase 1E A/B matrix. Both modes use unified Phase 1D components; only the
 ## return silhouette algorithm changes, so terrain data and framing match.
 
-const OUTPUT_DIR := "res://screenshots"
+const OUTPUT_DIR := "res://.artifacts"
 const FIXTURE_SIZE := Vector2i(48, 30)
 
 var demo

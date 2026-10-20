@@ -32,7 +32,7 @@ func _run() -> void:
 		"gpu": RenderingServer.get_video_adapter_name(),
 		"fixture": "phase1g_dense_exact", "viewport": [1280, 720],
 		"baseline": baseline, "prominent": prominent, "directional": directional}
-	var file := FileAccess.open("res://screenshots/phase3g_benchmark_graphical.json", FileAccess.WRITE)
+	var file := FileAccess.open("res://.artifacts/phase3g_benchmark_graphical.json", FileAccess.WRITE)
 	file.store_string(JSON.stringify(result, "\t"))
 	print("PHASE3G_BENCHMARK: PASS")
 	quit(0)

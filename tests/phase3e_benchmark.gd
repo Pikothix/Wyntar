@@ -1,7 +1,7 @@
 extends "res://tests/phase3d_benchmark.gd"
 ## Paired Phase 3D/3E graphical benchmark on the accepted dense fixture.
 
-const PHASE3E_OUTPUT_PATH := "res://screenshots/phase3e_benchmark_graphical.json"
+const PHASE3E_OUTPUT_PATH := "res://.artifacts/phase3e_benchmark_graphical.json"
 
 
 func _run() -> void:

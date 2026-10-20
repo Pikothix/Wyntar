@@ -3,7 +3,7 @@ extends SceneTree
 ## it does not introduce Phase 2C streaming optimisation.
 
 const ObliqueProjection = preload("res://scripts/oblique_projection.gd")
-const OUTPUT_PATH := "res://screenshots/phase2b_benchmark.json"
+const OUTPUT_PATH := "res://.artifacts/phase2b_benchmark.json"
 const SAMPLE_FRAMES := 120
 
 var demo

@@ -2,7 +2,7 @@ extends SceneTree
 ## Confirms the shipped main scene selects the unified top-down cliff path
 ## without a capture-only toggle, then records the normal gameplay view.
 
-const OUTPUT_PATH := "res://screenshots/phase1d_main_startup_1_0x.png"
+const OUTPUT_PATH := "res://.artifacts/phase1d_main_startup_1_0x.png"
 
 var demo
 var terrain

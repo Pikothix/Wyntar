@@ -34,7 +34,7 @@ func _run() -> void:
 	await _move_camera(Vector2i(2048, 2048))
 	results.enhanced = await _sample_mode(true)
 	results.comparison = _compare(results.baseline, results.enhanced)
-	var path := "res://screenshots/phase_a_water_benchmark.json"
+	var path := "res://.artifacts/phase_a_water_benchmark.json"
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	assert(file != null, "Could not write %s" % path)
 	file.store_string(JSON.stringify(results, "\t"))
