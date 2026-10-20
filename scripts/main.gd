@@ -861,7 +861,7 @@ func _create_hud() -> void:
 	hud_content.add_child(expanded_hud_box)
 	var box: VBoxContainer = expanded_hud_box
 	var title := Label.new()
-	title.text = "UNIVERSAL MASK TERRAIN"
+	title.text = "WYNTAR"
 	title.add_theme_color_override("font_color", Color("f2f4f0"))
 	title.add_theme_font_size_override("font_size", 17)
 	box.add_child(title)

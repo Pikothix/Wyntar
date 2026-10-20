@@ -1,15 +1,35 @@
-# Universal Mask Terrain — Godot 4.7 starter
+# Wyntar
 
-A self-contained, **paintable dual-grid terrain prototype**. It builds on Xerako's four-corner 4-bit masks but uses **one authoritative world lookup + four compositing TileMapLayers per loaded chunk**, not a separate TileMapLayer for every material.
+Wyntar is a Godot 4.7 top-down terrain and world-simulation prototype. Its current vertical slice combines deterministic chunked terrain, paintable material and elevation overrides, cliffs, water, procedural vegetation and environmental resources with versioned development saves. The simulation owns authoritative state; rendering derives the visible world from it.
+
+The project is still under active development. Its organic and directional cliff experiments, oblique comparison mode, and enhanced water controls are evaluation surfaces rather than production-ready visual systems.
 
 ## Open and run
-1. Unzip the folder.
-2. In Godot 4.7, choose **Import** and select `project.godot`.
-3. Run the main scene with **F6**, or run the project with **F5**.
-4. Use the collapsible **World Editor** toolbar to select material or elevation editing, a circular or square brush, and brush diameters of 1, 3, 5, 7 or 11 logical cells. **[** and **]** resize the brush. Left-drag applies the selected tool; movement is interpolated between sampled cells so fast strokes do not leave gaps. In material mode, right-drag restores generated material. In elevation mode, choose Raise, Lower, Set Height, Flatten (which samples its target when the stroke begins), or Restore Generated; right-drag remains a quick Lower action. Raise and Lower affect each cell at most once per stroke. **1–8** continue to select water, sand, dirt, grass, stone, snow, mud and gravel, while **H** switches material/elevation mode.
-5. **Ctrl+Z** undoes one completed stroke and **Ctrl+Y** or **Ctrl+Shift+Z** redoes it. A new edit after undo clears the redo branch. **R** opens a confirmation dialog for resetting all sparse edits; the confirmed reset is itself one undoable transaction. History retains the latest 50 transactions and is intentionally in-memory only.
-6. Pan with **WASD**, the **arrow keys**, or middle-mouse drag. Use the mouse wheel to zoom toward the cursor and **Home** to reset the camera. **P** compares procedural elevation on/off without discarding edits. **G** overlays the grid, **V** compares texture variation on/off, **O** compares organic boundaries on/off, **D** toggles procedural ground details, and **T** toggles larger environmental objects. **F2** switches between compact and expanded HUDs, **F3** shows streaming diagnostics, **F4** shows the selected logical cell plus its four affected dual-grid cells, and **F6** overlays authoritative elevation colours and face extents. Editor controls block painting behind the interface.
-7. **Ctrl+S** safely writes the single development slot, and **Ctrl+L** validates and loads it. The expanded HUD shows saved, loaded, unsaved-change and error status.
+
+1. In standard Godot 4.7, choose **Import** and select `project.godot`.
+2. Run the main scene with **F6**, or run the project with **F5**.
+3. Use the collapsible **World Editor** toolbar to select material or elevation editing, a circular or square brush, and brush diameters of 1, 3, 5, 7 or 11 logical cells. **[** and **]** resize the brush. Left-drag applies the selected tool; movement is interpolated between sampled cells so fast strokes do not leave gaps. In material mode, right-drag restores generated material. In elevation mode, choose Raise, Lower, Set Height, Flatten (which samples its target when the stroke begins), or Restore Generated; right-drag remains a quick Lower action. Raise and Lower affect each cell at most once per stroke. **1–8** continue to select water, sand, dirt, grass, stone, snow, mud and gravel, while **H** switches material/elevation mode.
+4. **Ctrl+Z** undoes one completed stroke and **Ctrl+Y** or **Ctrl+Shift+Z** redoes it. A new edit after undo clears the redo branch. **R** opens a confirmation dialog for resetting all sparse edits; the confirmed reset is itself one undoable transaction. History retains the latest 50 transactions and is intentionally in-memory only.
+5. Pan with **WASD**, the **arrow keys**, or middle-mouse drag. Use the mouse wheel to zoom toward the cursor and **Home** to reset the camera. **P** compares procedural elevation on/off without discarding edits. **G** overlays the grid, **V** compares texture variation on/off, **O** compares organic boundaries on/off, **D** toggles procedural ground details, and **T** toggles larger environmental objects. **F2** switches between compact and expanded HUDs, **F3** shows streaming diagnostics, **F4** shows the selected logical cell plus its four affected dual-grid cells, and **F6** overlays authoritative elevation colours and face extents. Editor controls block painting behind the interface.
+6. **Ctrl+S** safely writes the single development slot, and **Ctrl+L** validates and loads it. The expanded HUD shows saved, loaded, unsaved-change and error status.
+
+Wyntar uses the Godot 4.7 GL Compatibility renderer. For compatibility with saves created before the project rename, `user://` intentionally remains rooted at the legacy `Godot/app_userdata/Universal Mask Terrain` directory. The active save remains `user://saves/quicksave.json`; its format and filename are unchanged.
+
+## Project layout
+
+- `scripts/` contains simulation owners, controllers, deterministic generators, save/load code and rendering adapters.
+- `scripts/procgen/` contains the locally adapted, deterministic presentation generators used by environmental objects.
+- `art/` contains runtime terrain textures.
+- `shaders/` contains required runtime shaders.
+- `tests/` contains tracked validation, benchmark and capture scripts.
+- `.artifacts/` is the ignored output location for newly generated captures, benchmark JSON and validation evidence.
+- Historical Phase C1 evidence is preserved outside the repository under `G:/Sim/Wyntar_Archive/`; see `PHASE_C1_REPOSITORY_HYGIENE_REPORT.md` and its archive manifest for the exact snapshot.
+
+## Development workflow
+
+Keep authoritative changes in the simulation owners, request them through controllers/UI, and treat rendering as derived presentation. After a focused change, run the matching headless validator with standard Godot 4.7, launch the main scene when presentation or startup is affected, and run `git diff --check`. Generated evidence belongs in `res://.artifacts/`, not in runtime asset directories.
+
+The current presentation goal is readable top-down 2D terrain. Organic cliff geometry, unified contours and directional projection are available as experimental controls; oblique presentation remains a comparison mode rather than the default direction. The committed scene enables directional/unified experiments, while Phase 3G still records unresolved corner/sliver quality and recommends visual approval before treating directional projection as an accepted default. Experimental water enhancement is also controlled independently and does not own gameplay state.
 
 ## Architecture
 * `scripts/terrain_catalog.gd` — terrain IDs, priorities, liquid metadata, source art and data-driven visual variant definitions.
