@@ -18,8 +18,6 @@ const EnvironmentObjectSpriteFactory = preload("res://scripts/procgen/environmen
 const ResourceStateManager = preload("res://scripts/resource_state_manager.gd")
 const VariationShader = preload("res://shaders/terrain_variation.gdshader")
 const CliffProceduralShader = preload("res://shaders/cliff_procedural.gdshader")
-const ObliqueProjection = preload("res://scripts/oblique_projection.gd")
-const ObliqueTerrainRenderer = preload("res://scripts/oblique_terrain_renderer.gd")
 
 const TILE_SIZE: Vector2i = Vector2i(32, 32)
 const CHUNK_SIZE: int = 32
@@ -79,8 +77,6 @@ var connected_cliff_contours_enabled: bool = false
 var unified_cliff_contours_enabled: bool = false
 var directional_cliff_projection_enabled: bool = false
 var cliff_height_profile: int = CliffHeightProfile.BASELINE
-var oblique_presentation_enabled: bool = false
-var organic_oblique_refinement_enabled: bool = false
 var cliff_edge_overlays_visible: bool = true
 var cliff_shadows_visible: bool = true
 var profiling_enabled: bool = false
@@ -127,7 +123,6 @@ var variant_count_by_id: Dictionary = {} # id -> int
 var cliff_material_by_source: Dictionary = {} # cliff source id -> shared ShaderMaterial
 var cliff_shadow_material_by_source: Dictionary = {} # source id -> shared foot material
 var organic_cliff_material: ShaderMaterial # Shared encoded-source mesh material.
-var oblique_renderer # ObliqueTerrainRenderer; presentation-only prototype.
 var chunks_finalised_this_frame: int = 0
 var last_chunk_total_usec: int = 0
 var last_chunk_layer_creation_usec: int = 0
@@ -247,14 +242,6 @@ func _ready() -> void:
 		elevation_flatness_bias)
 	world = TerrainWorld.new()
 	world.configure(generator)
-	oblique_renderer = ObliqueTerrainRenderer.new()
-	oblique_renderer.name = "ExperimentalObliqueTerrain"
-	oblique_renderer.configure(
-		world_seed, MAX_ELEVATION,
-		get_world_visible_cell, get_world_surface_elevation, liquid_by_id,
-		organic_oblique_refinement_enabled)
-	oblique_renderer.visible = oblique_presentation_enabled
-	add_child(oblique_renderer)
 
 
 func _process(delta: float) -> void:
@@ -364,16 +351,9 @@ func _process(delta: float) -> void:
 
 
 func update_visible_world_rect(visible_rect: Rect2) -> void:
-	var visible_cell_min: Vector2i
-	var visible_cell_max: Vector2i
-	if oblique_presentation_enabled:
-		var bounds: Rect2i = oblique_renderer.get_visible_cell_bounds(visible_rect)
-		visible_cell_min = bounds.position
-		visible_cell_max = bounds.end - Vector2i.ONE
-	else:
-		visible_cell_min = world_pixel_to_cell(visible_rect.position)
-		var inclusive_end: Vector2 = visible_rect.end - Vector2(0.001, 0.001)
-		visible_cell_max = world_pixel_to_cell(inclusive_end)
+	var visible_cell_min: Vector2i = world_pixel_to_cell(visible_rect.position)
+	var inclusive_end: Vector2 = visible_rect.end - Vector2(0.001, 0.001)
+	var visible_cell_max: Vector2i = world_pixel_to_cell(inclusive_end)
 	var visible_min: Vector2i = world_cell_to_chunk(visible_cell_min)
 	var visible_max: Vector2i = world_cell_to_chunk(visible_cell_max)
 	if visible_min == _last_visible_chunk_min and visible_max == _last_visible_chunk_max:
@@ -404,7 +384,6 @@ func update_visible_world_rect(visible_rect: Rect2) -> void:
 			var chunk = loaded_chunks[chunk_coord]
 			loaded_chunks.erase(chunk_coord)
 			environment_object_renderer.remove_chunk(chunk_coord)
-			oblique_renderer.remove_chunk(chunk_coord)
 			_discard_organic_rebuild_job(chunk_coord)
 			_organic_geometry_revisions.erase(chunk_coord)
 			_organic_terrain_revisions.erase(chunk_coord)
@@ -624,10 +603,6 @@ func _refresh_world_cells(changed_cells: Dictionary) -> void:
 				_organic_terrain_revisions[chunk_coord] = int(
 					_organic_terrain_revisions.get(chunk_coord, 0)) + 1
 				_schedule_organic_cliff_rebuild(chunk_coord)
-	if oblique_presentation_enabled:
-		for chunk_coord in organic_cliff_chunks:
-			if loaded_chunks.has(chunk_coord):
-				oblique_renderer.rebuild_chunk(chunk_coord)
 	last_edit_dirty_chunk_count = dirty_chunks.size()
 
 
@@ -745,7 +720,6 @@ func _invalidate_streamed_chunks() -> void:
 		_queue_chunk_retirement(chunk)
 	loaded_chunks.clear()
 	environment_object_renderer.clear_chunks()
-	oblique_renderer.clear_chunks()
 	for chunk_coord in _build_jobs.keys():
 		_discard_build_job(chunk_coord)
 	for chunk_coord in _organic_rebuild_jobs.keys():
@@ -1243,40 +1217,6 @@ func set_cliff_shadows_visible(visible_value: bool) -> void:
 		chunk.set_cliff_shadows_visible(visible_value)
 
 
-func set_oblique_presentation_enabled(enabled: bool) -> void:
-	if oblique_presentation_enabled == enabled:
-		return
-	oblique_presentation_enabled = enabled
-	oblique_renderer.visible = enabled
-	environment_object_renderer.visible = not enabled
-	for chunk_coord in loaded_chunks:
-		var chunk = loaded_chunks[chunk_coord]
-		chunk.visible = not enabled
-		if enabled:
-			oblique_renderer.rebuild_chunk(chunk_coord)
-	_last_visible_chunk_min = Vector2i(2147483647, 2147483647)
-	_last_visible_chunk_max = Vector2i(-2147483648, -2147483648)
-
-
-func is_oblique_presentation_enabled() -> bool:
-	return oblique_presentation_enabled
-
-
-func set_organic_oblique_refinement_enabled(enabled: bool) -> void:
-	if organic_oblique_refinement_enabled == enabled:
-		return
-	organic_oblique_refinement_enabled = enabled
-	oblique_renderer.set_refinement_enabled(enabled)
-
-
-func is_organic_oblique_refinement_enabled() -> bool:
-	return organic_oblique_refinement_enabled
-
-
-func get_oblique_metrics() -> Dictionary:
-	return oblique_renderer.get_metrics()
-
-
 func is_organic_cliff_geometry_enabled() -> bool:
 	return organic_cliff_geometry_enabled
 
@@ -1361,16 +1301,6 @@ func world_pixel_to_cell(pixel_pos: Vector2) -> Vector2i:
 
 
 func get_projected_cell_rect(world_pos: Vector2i) -> Rect2:
-	if oblique_presentation_enabled:
-		var polygon: PackedVector2Array = get_projected_cell_polygon(world_pos)
-		var minimum: Vector2 = polygon[0]
-		var maximum: Vector2 = polygon[0]
-		for point in polygon:
-			minimum.x = minf(minimum.x, point.x)
-			minimum.y = minf(minimum.y, point.y)
-			maximum.x = maxf(maximum.x, point.x)
-			maximum.y = maxf(maximum.y, point.y)
-		return Rect2(minimum, maximum - minimum)
 	var elevation: int = get_world_surface_elevation(world_pos)
 	return Rect2(
 		Vector2(world_pos * TILE_SIZE) - Vector2(0.0, float(elevation * get_cliff_height_step())),
@@ -1378,8 +1308,6 @@ func get_projected_cell_rect(world_pos: Vector2i) -> Rect2:
 
 
 func get_projected_cell_polygon(world_pos: Vector2i) -> PackedVector2Array:
-	if oblique_presentation_enabled:
-		return oblique_renderer.get_projected_cell_polygon(world_pos)
 	var rect := get_projected_cell_rect(world_pos)
 	return PackedVector2Array([
 		rect.position,
@@ -1390,12 +1318,6 @@ func get_projected_cell_polygon(world_pos: Vector2i) -> PackedVector2Array:
 
 
 func pick_world_position(pixel_pos: Vector2, target_ground: bool = false) -> Dictionary:
-	if oblique_presentation_enabled:
-		var projected_pick: Dictionary = oblique_renderer.pick(pixel_pos, target_ground)
-		return _make_pick(
-			projected_pick.cell, int(projected_pick.elevation),
-			bool(projected_pick.is_cliff), int(projected_pick.cliff_drop),
-			bool(projected_pick.targets_ground))
 	# Raised cells project upward and can overlap the flat logical cell under
 	# the cursor. Resolve the same height ordering used by the visual layers.
 	var flat_cell: Vector2i = world_pixel_to_cell(pixel_pos)
@@ -1478,7 +1400,6 @@ func _begin_job_population(job) -> void:
 		directional_cliff_projection_enabled)
 	chunk.set_cliff_edge_overlays_visible(cliff_edge_overlays_visible)
 	chunk.set_cliff_shadows_visible(cliff_shadows_visible)
-	chunk.visible = not oblique_presentation_enabled
 	job.layer_creation_usec = Time.get_ticks_usec() - phase_start
 	phase_start = Time.get_ticks_usec()
 	add_child(chunk)
@@ -1501,8 +1422,6 @@ func _finalize_build_job(chunk_coord: Vector2i, job) -> void:
 		job.environment_object_anchor_y,
 		job.environment_object_heights)
 	loaded_chunks[chunk_coord] = job.renderer
-	if oblique_presentation_enabled:
-		oblique_renderer.rebuild_chunk(chunk_coord)
 	_build_jobs.erase(chunk_coord)
 	_pending_chunks.erase(chunk_coord)
 	chunks_finalised_this_frame += 1

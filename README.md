@@ -2,7 +2,7 @@
 
 Wyntar is a Godot 4.7 top-down terrain and world-simulation prototype. Its current vertical slice combines deterministic chunked terrain, paintable material and elevation overrides, cliffs, water, procedural vegetation and environmental resources with versioned development saves. The simulation owns authoritative state; rendering derives the visible world from it.
 
-The project is still under active development. Its organic and directional cliff experiments, oblique comparison mode, and enhanced water controls are evaluation surfaces rather than production-ready visual systems.
+The project is still under active development. Its organic and directional cliff experiments and enhanced water controls are evaluation surfaces rather than production-ready visual systems. Wyntar supports only the top-down presentation path; the former oblique prototype was retired in Phase C3.
 
 ## Open and run
 
@@ -29,7 +29,7 @@ Wyntar uses the Godot 4.7 GL Compatibility renderer. For compatibility with save
 
 Keep authoritative changes in the simulation owners, request them through controllers/UI, and treat rendering as derived presentation. After a focused change, run the matching headless validator with standard Godot 4.7, launch the main scene when presentation or startup is affected, and run `git diff --check`. Generated evidence belongs in `res://.artifacts/`, not in runtime asset directories.
 
-The current presentation goal is readable top-down 2D terrain. Organic cliff geometry, unified contours and directional projection are available as experimental controls; oblique presentation remains a comparison mode rather than the default direction. The committed scene enables directional/unified experiments, while Phase 3G still records unresolved corner/sliver quality and recommends visual approval before treating directional projection as an accepted default. Experimental water enhancement is also controlled independently and does not own gameplay state.
+The current presentation goal is readable top-down 2D terrain. Organic cliff geometry, unified contours and directional projection are available as experimental controls. The committed scene enables directional/unified experiments, while Phase 3G still records unresolved corner/sliver quality and recommends visual approval before treating directional projection as an accepted default. Experimental water enhancement is also controlled independently and does not own gameplay state.
 
 ## Architecture
 * `scripts/terrain_catalog.gd` — terrain IDs, priorities, liquid metadata, source art and data-driven visual variant definitions.

@@ -215,7 +215,6 @@ func _write_manifest() -> void:
 			"organic_cliff_geometry": terrain.is_organic_cliff_geometry_enabled(),
 			"unified_cliff_components": terrain.is_unified_cliff_components_enabled(),
 			"refined_cliff_silhouettes": terrain.is_refined_cliff_silhouettes_enabled(),
-			"oblique_projection": terrain.is_oblique_presentation_enabled(),
 		},
 		"scenarios": scenario_records,
 		"captures": captures,
