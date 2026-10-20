@@ -22,6 +22,7 @@ func _run() -> void:
 	terrain.set_organic_cliff_geometry_enabled(true)
 	terrain.set_unified_cliff_components_enabled(true)
 	terrain.set_refined_cliff_silhouettes_enabled(true)
+	terrain.set_unified_cliff_contours_enabled(false)
 	var center := Vector2i(10200, 5100)
 	_build_fixture(center)
 	await _move_camera(center)

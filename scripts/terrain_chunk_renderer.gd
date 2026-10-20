@@ -46,6 +46,7 @@ var _organic_cliff_geometry_enabled: bool = false
 var _unified_cliff_components_enabled: bool = false
 var _refined_cliff_silhouettes_enabled: bool = false
 var _connected_cliff_contours_enabled: bool = false
+var _unified_cliff_contours_enabled: bool = false
 var _cliff_edge_overlays_visible: bool = true
 var _cliff_shadows_visible: bool = true
 var _organic_cliff_world_seed: int = 0
@@ -92,6 +93,7 @@ func configure(
         unified_cliff_components_enabled: bool,
         refined_cliff_silhouettes_enabled: bool,
         connected_cliff_contours_enabled: bool,
+        unified_cliff_contours_enabled: bool,
         organic_cliff_world_seed: int,
         organic_cliff_material: Material,
         initial_max_elevation: int = 0) -> void:
@@ -114,6 +116,7 @@ func configure(
     _unified_cliff_components_enabled = unified_cliff_components_enabled
     _refined_cliff_silhouettes_enabled = refined_cliff_silhouettes_enabled
     _connected_cliff_contours_enabled = connected_cliff_contours_enabled
+    _unified_cliff_contours_enabled = unified_cliff_contours_enabled
     _organic_cliff_world_seed = organic_cliff_world_seed
     _organic_cliff_material = organic_cliff_material
     position = Vector2(coord * CHUNK_SIZE * TILE_SIZE)
@@ -309,7 +312,7 @@ func rebuild_organic_cliffs() -> void:
         chunk_coord, MAX_ELEVATION, _organic_cliff_world_seed,
         _world_lookup, _height_lookup, liquid_by_id,
         _unified_cliff_components_enabled, _refined_cliff_silhouettes_enabled,
-        _connected_cliff_contours_enabled)
+        _connected_cliff_contours_enabled, _unified_cliff_contours_enabled)
     organic_cliff_geometry_usec = int(result.build_usec)
     organic_cliff_face_count = int(result.face_count)
     organic_cliff_vertex_count = int(result.vertex_count)
@@ -318,7 +321,10 @@ func rebuild_organic_cliffs() -> void:
     organic_cliff_shadow_count = int(result.shadow_count)
     organic_cliff_height_query_count = int(result.height_query_count)
     organic_cliff_material_query_count = int(result.material_query_count)
-    _assign_organic_meshes(result.meshes, organic_cliff_mesh_layers, -2, "OrganicCliffsHeight")
+    _assign_organic_meshes(
+            result.meshes, organic_cliff_mesh_layers,
+            3 if _unified_cliff_contours_enabled else -2,
+            "OrganicCliffsHeight")
     if _unified_cliff_components_enabled:
         _assign_organic_meshes(
             result.edge_meshes, organic_cliff_edge_mesh_layers, 4,
@@ -358,8 +364,9 @@ func apply_prepared_organic_cliffs(result: Dictionary) -> int:
     organic_cliff_vertex_assembly_usec = int(result.get("vertex_assembly_usec", 0))
     organic_cliff_mesh_resource_usec = int(result.get("mesh_resource_usec", 0))
     _assign_organic_meshes(
-        result.get("meshes", []), organic_cliff_mesh_layers, -2,
-        "OrganicCliffsHeight")
+            result.get("meshes", []), organic_cliff_mesh_layers,
+            3 if _unified_cliff_contours_enabled else -2,
+            "OrganicCliffsHeight")
     if _unified_cliff_components_enabled:
         _assign_organic_meshes(
             result.get("edge_meshes", []), organic_cliff_edge_mesh_layers, 4,
@@ -412,6 +419,13 @@ func set_connected_cliff_contours_enabled(enabled: bool) -> void:
     mark_organic_cliff_geometry_pending()
 
 
+func set_unified_cliff_contours_enabled(enabled: bool) -> void:
+    if _unified_cliff_contours_enabled == enabled:
+        return
+    _unified_cliff_contours_enabled = enabled
+    mark_organic_cliff_geometry_pending()
+
+
 func set_cliff_edge_overlays_visible(visible_value: bool) -> void:
     _cliff_edge_overlays_visible = visible_value
     _update_cliff_component_visibility()
@@ -436,6 +450,10 @@ func is_refined_cliff_silhouettes_enabled() -> bool:
 
 func is_connected_cliff_contours_enabled() -> bool:
     return _connected_cliff_contours_enabled
+
+
+func is_unified_cliff_contours_enabled() -> bool:
+    return _unified_cliff_contours_enabled
 
 
 func get_organic_cliff_geometry_stats() -> Dictionary:
@@ -780,6 +798,7 @@ func _assign_organic_meshes(
             continue
         var layer: MeshInstance2D = _ensure_organic_component_mesh_layer(
             mesh_layers, index, z_offset, layer_prefix)
+        layer.z_index = (index + 1) * 8 + z_offset
         layer.mesh = meshes[index]
         layer.visible = false
 

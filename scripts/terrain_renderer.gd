@@ -61,6 +61,7 @@ var organic_cliff_geometry_enabled: bool = false
 var unified_cliff_components_enabled: bool = false
 var refined_cliff_silhouettes_enabled: bool = false
 var connected_cliff_contours_enabled: bool = false
+var unified_cliff_contours_enabled: bool = false
 var oblique_presentation_enabled: bool = false
 var organic_oblique_refinement_enabled: bool = false
 var cliff_edge_overlays_visible: bool = true
@@ -1110,6 +1111,19 @@ func set_connected_cliff_contours_enabled(enabled: bool) -> void:
 	_restart_pending_stream_builds()
 
 
+func set_unified_cliff_contours_enabled(enabled: bool) -> void:
+	## Phase 3E presentation-only rollback switch. Disabled restores Phase 3D.
+	if unified_cliff_contours_enabled == enabled:
+		return
+	unified_cliff_contours_enabled = enabled
+	for chunk in loaded_chunks.values():
+		chunk.set_unified_cliff_contours_enabled(enabled)
+	if organic_cliff_geometry_enabled:
+		for chunk_coord in loaded_chunks:
+			_schedule_organic_cliff_rebuild(chunk_coord, true)
+	_restart_pending_stream_builds()
+
+
 func set_cliff_edge_overlays_visible(visible_value: bool) -> void:
 	cliff_edge_overlays_visible = visible_value
 	for chunk in loaded_chunks.values():
@@ -1170,6 +1184,10 @@ func is_refined_cliff_silhouettes_enabled() -> bool:
 
 func is_connected_cliff_contours_enabled() -> bool:
 	return connected_cliff_contours_enabled
+
+
+func is_unified_cliff_contours_enabled() -> bool:
+	return unified_cliff_contours_enabled
 
 
 func get_variant_texture_count() -> int:
@@ -1346,6 +1364,7 @@ func _begin_job_population(job) -> void:
 		decorations_enabled, organic_cliff_geometry_enabled,
 		unified_cliff_components_enabled, refined_cliff_silhouettes_enabled,
 		connected_cliff_contours_enabled,
+		unified_cliff_contours_enabled,
 		world_seed,
 		organic_cliff_material, job.max_elevation_present)
 	chunk.set_cliff_edge_overlays_visible(cliff_edge_overlays_visible)
@@ -1444,6 +1463,7 @@ func _create_build_job(chunk_coord: Vector2i):
 		organic_cliff_geometry_enabled, world_seed, liquid_by_id,
 		unified_cliff_components_enabled, refined_cliff_silhouettes_enabled,
 		connected_cliff_contours_enabled,
+		unified_cliff_contours_enabled,
 		int(_organic_geometry_revisions.get(chunk_coord, 0)), profiling_enabled)
 	return job
 
@@ -1466,6 +1486,7 @@ func _schedule_organic_cliff_rebuild(
 		true, world_seed, liquid_by_id,
 		unified_cliff_components_enabled, refined_cliff_silhouettes_enabled,
 		connected_cliff_contours_enabled,
+		unified_cliff_contours_enabled,
 		revision, profiling_enabled)
 	if reuse_cached_halo and _organic_halo_cache.has(chunk_coord):
 		var cached: Dictionary = _organic_halo_cache[chunk_coord]

@@ -4,6 +4,7 @@ extends "res://tests/phase3b_capture.gd"
 
 
 func _move_camera(cell: Vector2i, zoom: float) -> void:
+	terrain.set_unified_cliff_contours_enabled(false)
 	terrain.set_connected_cliff_contours_enabled(capture_label == "prototype")
 	await super._move_camera(cell, zoom)
 

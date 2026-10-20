@@ -23,7 +23,8 @@ static func build(
 		liquid_by_id: Dictionary,
 		unified_components_enabled: bool = false,
 		refined_silhouettes_enabled: bool = false,
-		connected_contours_enabled: bool = false) -> Dictionary:
+		connected_contours_enabled: bool = false,
+		unified_contours_enabled: bool = false) -> Dictionary:
 	var started_usec: int = Time.get_ticks_usec()
 	var sampling_started_usec: int = Time.get_ticks_usec()
 	# One bounded halo read replaces repeated height/material callbacks from the
@@ -44,7 +45,7 @@ static func build(
 	var state: Dictionary = create_incremental(
 		chunk_coord, max_elevation, world_seed, halo_ids, halo_heights,
 		liquid_by_id, unified_components_enabled, refined_silhouettes_enabled,
-		connected_contours_enabled, true)
+		connected_contours_enabled, unified_contours_enabled, true)
 	process_incremental(state, CHUNK_SIZE * CHUNK_SIZE)
 	var result: Dictionary = finalize_incremental(state)
 	result.sampling_usec = sampling_usec
@@ -60,6 +61,7 @@ static func create_incremental(
 		liquid_by_id: Dictionary, unified_components_enabled: bool,
 		refined_silhouettes_enabled: bool,
 		connected_contours_enabled: bool = false,
+		unified_contours_enabled: bool = false,
 		profiling_enabled: bool = false) -> Dictionary:
 	## The caller owns the immutable 34x34 snapshot. All mutable state below is
 	## presentation-only and can be discarded safely when a chunk is invalidated.
@@ -73,6 +75,7 @@ static func create_incremental(
 		"unified_components_enabled": unified_components_enabled,
 		"refined_silhouettes_enabled": refined_silhouettes_enabled,
 		"connected_contours_enabled": connected_contours_enabled,
+		"unified_contours_enabled": unified_contours_enabled,
 		"profiling_enabled": profiling_enabled,
 		"cell_index": 0,
 		"buffers": {},
@@ -107,6 +110,19 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 	var started_usec: int = Time.get_ticks_usec() if profiling_enabled else 0
 	var local_x: int = cell_index % CHUNK_SIZE
 	var local_y: int = floori(float(cell_index) / CHUNK_SIZE)
+	if bool(state.unified_contours_enabled):
+		var owner_index: int = (
+			(local_y + HALO_MARGIN) * HALO_SIZE + local_x + HALO_MARGIN)
+		if _is_isolated_halo_sample(state.halo_heights, owner_index):
+			# Preserve the accepted Phase 3D caps and returns for isolated peaks.
+			state.unified_contours_enabled = false
+			_process_cell(state, cell_index)
+			state.unified_contours_enabled = true
+			return
+		_process_unified_contour_square(state, local_x, local_y)
+		if profiling_enabled:
+			state.face_construction_usec += Time.get_ticks_usec() - started_usec
+		return
 	var world_pos: Vector2i = state.chunk_coord * CHUNK_SIZE + Vector2i(local_x, local_y)
 	var center_index: int = (
 		(local_y + HALO_MARGIN) * HALO_SIZE + local_x + HALO_MARGIN)
@@ -225,6 +241,280 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 		state.contour_generation_usec += maxi(0, geometry_elapsed_usec - vertex_elapsed_usec)
 		state.edge_component_count += edge_result.x
 		state.triangle_count += edge_result.y
+
+
+static func _process_unified_contour_square(
+		state: Dictionary, local_x: int, local_y: int) -> void:
+	## Phase 3E owns one four-sample render square. The same square supplies the
+	## elevated-surface mask, so contour crossings remain inside covered terrain.
+	# Render cell (x, y) is centred on the bottom-right sample of its four-corner
+	# mask; its top-left sample is one halo cell northwest.
+	var center_index: int = local_y * HALO_SIZE + local_x
+	var corner_indices := PackedInt32Array([
+		center_index, center_index + 1,
+		center_index + HALO_SIZE, center_index + HALO_SIZE + 1])
+	var first_height: int = int(state.halo_heights[corner_indices[0]])
+	if (first_height == int(state.halo_heights[corner_indices[1]])
+			and first_height == int(state.halo_heights[corner_indices[2]])
+			and first_height == int(state.halo_heights[corner_indices[3]])):
+		return
+	for index in corner_indices:
+		if _is_isolated_halo_sample(state.halo_heights, index):
+			return
+	var heights := PackedInt32Array()
+	var ids := PackedInt32Array()
+	for index in corner_indices:
+		heights.append(int(state.halo_heights[index]))
+		ids.append(int(state.halo_ids[index]))
+	var world_cell: Vector2i = (
+		state.chunk_coord * CHUNK_SIZE + Vector2i(local_x, local_y))
+	var max_height: int = 0
+	for height in heights:
+		max_height = maxi(max_height, height)
+	max_height = mini(int(state.max_elevation), max_height)
+	for level in range(1, max_height + 1):
+		var mask: int = 0
+		for corner in range(4):
+			if heights[corner] >= level:
+				mask |= 8 >> corner
+		if mask == 0 or mask == 15:
+			continue
+		var source_id: int = _unified_contour_source(
+			heights, ids, level, state.liquid_by_id)
+		var segments: Array = _unified_contour_segments(
+			mask, world_cell, level, int(state.world_seed))
+		if segments.is_empty():
+			continue
+		# All bands of one projected drop share the square's highest render layer.
+		# Otherwise an upper surface can split stacked bands into parallel slivers.
+		var render_elevation: int = max_height
+		if not state.buffers.has(render_elevation):
+			state.buffers[render_elevation] = _new_buffer()
+		for segment in segments:
+			var path: PackedVector2Array = _unified_contour_path(
+				segment, mask, local_x, local_y, world_cell, level,
+				int(state.world_seed))
+			var triangles_before: int = state.buffers[render_elevation].indices.size() / 3
+			_append_unified_contour_band(
+				state.buffers[render_elevation], path, source_id, world_cell, level,
+				state.profile_metrics)
+			state.triangle_count += (
+				state.buffers[render_elevation].indices.size() / 3 - triangles_before)
+			state.face_count += 1
+			if bool(state.unified_components_enabled):
+				# The Phase 3B face shader already supplies the crest read. A second
+				# strip per marching segment both duplicated that silhouette and was
+				# the dominant Phase 3E geometry cost.
+				var contour_delta: Vector2 = path[path.size() - 1] - path[0]
+				var south_facing: bool = (
+					contour_delta.x < 0.0
+					and absf(contour_delta.x) >= absf(contour_delta.y))
+				if source_id < 2 and south_facing:
+					triangles_before = state.buffers[render_elevation].indices.size() / 3
+					_append_unified_contour_shadow(
+						state.buffers[render_elevation], path, source_id, world_cell,
+						level, state.profile_metrics)
+					state.triangle_count += (
+						state.buffers[render_elevation].indices.size() / 3 - triangles_before)
+					state.shadow_count += 1
+
+
+static func _is_isolated_halo_sample(halo_heights, index: int) -> bool:
+	var x: int = index % HALO_SIZE
+	var y: int = floori(float(index) / HALO_SIZE)
+	if x <= 0 or x >= HALO_SIZE - 1 or y <= 0 or y >= HALO_SIZE - 1:
+		return false
+	var height: int = int(halo_heights[index])
+	if height <= 0:
+		return false
+	for offset in [-HALO_SIZE, -1, 1, HALO_SIZE]:
+		if int(halo_heights[index + offset]) == height:
+			return false
+	return true
+
+
+static func _unified_contour_source(
+		heights: PackedInt32Array, ids: PackedInt32Array, level: int,
+		liquid_by_id: Dictionary) -> int:
+	var terrain_id: int = 3
+	var shoreline: bool = false
+	for corner in range(4):
+		if heights[corner] >= level:
+			terrain_id = ids[corner]
+			break
+	for corner in range(4):
+		if heights[corner] < level and bool(liquid_by_id.get(ids[corner], false)):
+			shoreline = true
+			break
+	return _cliff_source_for(terrain_id, shoreline)
+
+
+static func _unified_contour_segments(
+		mask: int, world_cell: Vector2i, level: int, world_seed: int) -> Array:
+	## Edge order is top, right, bottom, left. Saddle pairing is selected by an
+	## absolute cell key, never by traversal order.
+	var table := {
+		1: [[1, 2]], 2: [[2, 3]], 3: [[1, 3]], 4: [[0, 1]],
+		5: [[0, 2]], 7: [[0, 3]], 8: [[3, 0]], 10: [[0, 2]],
+		11: [[0, 1]], 12: [[3, 1]], 13: [[3, 2]], 14: [[2, 1]],
+	}
+	if mask == 6:
+		if (_hash_int(world_cell.x, world_cell.y, level, world_seed, 181) & 1) == 0:
+			return [[0, 1], [2, 3]]
+		return [[0, 3], [1, 2]]
+	if mask == 9:
+		if (_hash_int(world_cell.x, world_cell.y, level, world_seed, 181) & 1) == 0:
+			return [[3, 0], [1, 2]]
+		return [[3, 2], [0, 1]]
+	return table.get(mask, [])
+
+
+static func _unified_contour_path(
+		segment: Array, mask: int, local_x: int, local_y: int, world_cell: Vector2i,
+		level: int, world_seed: int) -> PackedVector2Array:
+	var first: Vector2 = _unified_edge_point(
+		int(segment[0]), local_x, local_y, world_cell, world_seed)
+	var last: Vector2 = _unified_edge_point(
+		int(segment[1]), local_x, local_y, world_cell, world_seed)
+	# Orient every segment with occupied/high terrain on its left. The projected
+	# face can then extend toward the low side (the right-hand normal) instead of
+	# being hidden beneath the elevated top mask.
+	var preliminary_delta: Vector2 = last - first
+	var left_normal := Vector2(-preliminary_delta.y, preliminary_delta.x).normalized()
+	var sample: Vector2 = (first + last) * 0.5 + left_normal * 3.0
+	var square_left: int = local_x * TILE_SIZE - TILE_SIZE / 2
+	var square_top: int = local_y * TILE_SIZE - TILE_SIZE / 2
+	var sample_u: float = clampf(
+		(sample.x - square_left) / TILE_SIZE, 0.0, 1.0)
+	var sample_v: float = clampf(
+		(sample.y - square_top) / TILE_SIZE, 0.0, 1.0)
+	if _unified_mask_field(mask, sample_u, sample_v) < 0.5:
+		var swap: Vector2 = first
+		first = last
+		last = swap
+	var delta: Vector2 = last - first
+	var normal := Vector2(-delta.y, delta.x).normalized()
+	var world_mid_x: int = world_cell.x * TILE_SIZE + roundi(
+		(first.x + last.x) * 0.5 - local_x * TILE_SIZE)
+	var world_mid_y: int = world_cell.y * TILE_SIZE + roundi(
+		(first.y + last.y) * 0.5 - local_y * TILE_SIZE)
+	var broad: float = _unified_world_field(
+		world_mid_x, world_mid_y, 96, world_seed, 191)
+	var fine: float = _unified_world_field(
+		world_mid_x, world_mid_y, 32, world_seed, 197)
+	var displacement: int = clampi(roundi(broad * 4.0 + fine * 2.0), -5, 5)
+	var middle: Vector2 = ((first + last) * 0.5 + normal * displacement).round()
+	middle.x = clampf(middle.x, square_left + 3, square_left + TILE_SIZE - 3)
+	middle.y = clampf(middle.y, square_top + 3, square_top + TILE_SIZE - 3)
+	# A vertical segment still needs projected area. Bow only its local midpoint;
+	# canonical edge endpoints remain untouched and therefore seam-identical.
+	if is_equal_approx(middle.x, first.x) or is_equal_approx(middle.x, last.x):
+		var bow: int = 2 if (
+			_hash_int(world_cell.x, world_cell.y, level, world_seed, 237) & 1) == 0 else -2
+		middle.x = clampf(middle.x + bow, square_left + 3, square_left + TILE_SIZE - 3)
+	var elevation_shift := Vector2(0, -level * HEIGHT_STEP)
+	return PackedVector2Array([
+		(first + elevation_shift).round(),
+		(middle + elevation_shift).round(),
+		(last + elevation_shift).round()])
+
+
+static func _unified_mask_field(mask: int, u: float, v: float) -> float:
+	var tl: float = 1.0 if (mask & 8) != 0 else 0.0
+	var tr: float = 1.0 if (mask & 4) != 0 else 0.0
+	var bl: float = 1.0 if (mask & 2) != 0 else 0.0
+	var br: float = 1.0 if (mask & 1) != 0 else 0.0
+	return lerpf(lerpf(tl, tr, u), lerpf(bl, br, u), v)
+
+
+static func _unified_edge_point(
+		edge: int, local_x: int, local_y: int, world_cell: Vector2i,
+		world_seed: int) -> Vector2:
+	var local_left: int = local_x * TILE_SIZE - TILE_SIZE / 2
+	var local_top: int = local_y * TILE_SIZE - TILE_SIZE / 2
+	var world_left: int = world_cell.x * TILE_SIZE - TILE_SIZE / 2
+	var world_top: int = world_cell.y * TILE_SIZE - TILE_SIZE / 2
+	if edge == 0 or edge == 2:
+		var horizontal_y: int = world_top + (0 if edge == 0 else TILE_SIZE)
+		var horizontal_offset: int = _unified_edge_offset(
+			world_left + TILE_SIZE / 2, horizontal_y, true, world_seed)
+		return Vector2(
+			local_left + TILE_SIZE / 2 + horizontal_offset,
+			local_top + (0 if edge == 0 else TILE_SIZE))
+	var vertical_x: int = world_left + (TILE_SIZE if edge == 1 else 0)
+	var vertical_offset: int = _unified_edge_offset(
+		world_top + TILE_SIZE / 2, vertical_x, false, world_seed)
+	return Vector2(
+		local_left + (TILE_SIZE if edge == 1 else 0),
+		local_top + TILE_SIZE / 2 + vertical_offset)
+
+
+static func _unified_edge_offset(
+		along_pixel: int, fixed_pixel: int, horizontal: bool,
+		world_seed: int) -> int:
+	var broad: float = _interpolated_contour_noise(
+		along_pixel, 96, floori(float(fixed_pixel) / TILE_SIZE), 0,
+		world_seed, 211 if horizontal else 223, 9) - 4.0
+	var fine: float = _interpolated_contour_noise(
+		along_pixel, 32, floori(float(fixed_pixel) / TILE_SIZE), 0,
+		world_seed, 229 if horizontal else 233, 5) - 2.0
+	return clampi(roundi(broad * 0.8 + fine * 0.5), -5, 5)
+
+
+static func _unified_world_field(
+		world_x: int, world_y: int, spacing: int, world_seed: int,
+		channel: int) -> float:
+	var coordinate: int = world_x + world_y
+	var anchor: int = floori(float(coordinate) / spacing)
+	var fraction: float = float(posmod(coordinate, spacing)) / float(spacing)
+	var first: float = float(posmod(_hash_int(
+		anchor, floori(float(world_x - world_y) / spacing), 0,
+		world_seed, channel), 9) - 4) / 4.0
+	var second: float = float(posmod(_hash_int(
+		anchor + 1, floori(float(world_x - world_y) / spacing), 0,
+		world_seed, channel), 9) - 4) / 4.0
+	return lerpf(first, second, fraction)
+
+
+static func _append_unified_contour_band(
+		buffer: Dictionary, path: PackedVector2Array, source_id: int,
+		world_cell: Vector2i, level: int, profile_metrics: Dictionary) -> void:
+	_append_unified_offset_strip(
+		buffer, path, -2, HEIGHT_STEP + 1, 5, 0.96, source_id, 0, 1.0,
+		_hash_int(world_cell.x, world_cell.y, level, 0, 239), profile_metrics)
+
+
+static func _append_unified_contour_shadow(
+		buffer: Dictionary, path: PackedVector2Array, source_id: int,
+		world_cell: Vector2i, level: int, profile_metrics: Dictionary) -> void:
+	_append_unified_offset_strip(
+		buffer, path, HEIGHT_STEP - 3, HEIGHT_STEP + 1, 4, 0.82,
+		source_id, 3, 0.34,
+		_hash_int(world_cell.x, world_cell.y, level, 0, 251), profile_metrics)
+
+
+static func _append_unified_offset_strip(
+		buffer: Dictionary, path: PackedVector2Array,
+		upper_y: int, lower_y: int, lateral_depth: int,
+		shade: float, source_id: int, component_role: int, alpha: float,
+		diagonal_seed: int, profile_metrics: Dictionary) -> void:
+	## Emit each segment independently. Pure vertical projection gives every
+	## shared crest endpoint the same foot endpoint; the bounded midpoint bow
+	## above prevents a vertical segment from collapsing to zero area.
+	for segment in range(path.size() - 1):
+		var first: Vector2 = path[segment]
+		var last: Vector2 = path[segment + 1]
+		var delta: Vector2 = last - first
+		var extrusion := Vector2(0, lower_y - upper_y)
+		if absf(delta.cross(extrusion)) < 1.0:
+			# This is reachable only after integer clamping at a square corner.
+			extrusion.x = 1 if lateral_depth > 0 else 0
+		_append_quad(
+			buffer, first + Vector2(0, upper_y), last + Vector2(0, upper_y),
+			last + Vector2(0, upper_y) + extrusion,
+			first + Vector2(0, upper_y) + extrusion,
+			shade, source_id, (diagonal_seed + segment) & 1,
+			component_role, alpha, profile_metrics)
 
 
 static func finalize_incremental(state: Dictionary) -> Dictionary:

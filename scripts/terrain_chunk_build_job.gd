@@ -81,6 +81,7 @@ var _organic_liquid_by_id: Dictionary = {}
 var _organic_unified_components_enabled: bool = false
 var _organic_refined_silhouettes_enabled: bool = false
 var _organic_connected_contours_enabled: bool = false
+var _organic_unified_contours_enabled: bool = false
 var _organic_profiling_enabled: bool = false
 
 var sampling_usec: int = 0
@@ -152,6 +153,7 @@ func configure_organic_geometry(
         enabled: bool, world_seed: int, liquid_by_id: Dictionary,
         unified_components_enabled: bool, refined_silhouettes_enabled: bool,
         connected_contours_enabled: bool = false,
+        unified_contours_enabled: bool = false,
         revision: int = 0, profiling_enabled: bool = false) -> void:
     organic_geometry_enabled = enabled
     organic_geometry_revision = revision
@@ -160,6 +162,7 @@ func configure_organic_geometry(
     _organic_unified_components_enabled = unified_components_enabled
     _organic_refined_silhouettes_enabled = refined_silhouettes_enabled
     _organic_connected_contours_enabled = connected_contours_enabled
+    _organic_unified_contours_enabled = unified_contours_enabled
     _organic_profiling_enabled = profiling_enabled
 
 
@@ -285,6 +288,7 @@ func process_organic_geometry_quantum(max_cells: int) -> int:
             _organic_unified_components_enabled,
             _organic_refined_silhouettes_enabled,
             _organic_connected_contours_enabled,
+            _organic_unified_contours_enabled,
             _organic_profiling_enabled)
     var started_usec: int = Time.get_ticks_usec()
     var processed: int = OrganicCliffMeshBuilder.process_incremental(

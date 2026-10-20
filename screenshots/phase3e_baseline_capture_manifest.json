@@ -1,0 +1,545 @@
+{
+	"capture_label": "baseline",
+	"captures": [
+		{
+			"camera_cell": [
+				20480,
+				10240
+			],
+			"camera_world": [
+				655376.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_long_diagonal_multichunk_0_5x.png",
+			"scenario": "long_diagonal_multichunk",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				20480,
+				10240
+			],
+			"camera_world": [
+				655376.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_long_diagonal_multichunk_1_0x.png",
+			"scenario": "long_diagonal_multichunk",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				20480,
+				10240
+			],
+			"camera_world": [
+				655376.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_long_diagonal_multichunk_2_31x.png",
+			"scenario": "long_diagonal_multichunk",
+			"zoom": 2.31
+		},
+		{
+			"camera_cell": [
+				20480,
+				10240
+			],
+			"camera_world": [
+				655376.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_long_diagonal_multichunk_3_0x.png",
+			"scenario": "long_diagonal_multichunk",
+			"zoom": 3.0
+		},
+		{
+			"camera_cell": [
+				20576,
+				10240
+			],
+			"camera_world": [
+				658448.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_s_winding_boundary_0_5x.png",
+			"scenario": "s_winding_boundary",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				20576,
+				10240
+			],
+			"camera_world": [
+				658448.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_s_winding_boundary_1_0x.png",
+			"scenario": "s_winding_boundary",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				20576,
+				10240
+			],
+			"camera_world": [
+				658448.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_s_winding_boundary_2_31x.png",
+			"scenario": "s_winding_boundary",
+			"zoom": 2.31
+		},
+		{
+			"camera_cell": [
+				20576,
+				10240
+			],
+			"camera_world": [
+				658448.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_s_winding_boundary_3_0x.png",
+			"scenario": "s_winding_boundary",
+			"zoom": 3.0
+		},
+		{
+			"camera_cell": [
+				20672,
+				10240
+			],
+			"camera_world": [
+				661520.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_convex_concave_corners_0_5x.png",
+			"scenario": "convex_concave_corners",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				20672,
+				10240
+			],
+			"camera_world": [
+				661520.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_convex_concave_corners_1_0x.png",
+			"scenario": "convex_concave_corners",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				20672,
+				10240
+			],
+			"camera_world": [
+				661520.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_convex_concave_corners_2_31x.png",
+			"scenario": "convex_concave_corners",
+			"zoom": 2.31
+		},
+		{
+			"camera_cell": [
+				20672,
+				10240
+			],
+			"camera_world": [
+				661520.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_convex_concave_corners_3_0x.png",
+			"scenario": "convex_concave_corners",
+			"zoom": 3.0
+		},
+		{
+			"camera_cell": [
+				20768,
+				10240
+			],
+			"camera_world": [
+				664592.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_isolated_one_two_three_0_5x.png",
+			"scenario": "isolated_one_two_three",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				20768,
+				10240
+			],
+			"camera_world": [
+				664592.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_isolated_one_two_three_1_0x.png",
+			"scenario": "isolated_one_two_three",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				20768,
+				10240
+			],
+			"camera_world": [
+				664592.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_isolated_one_two_three_2_31x.png",
+			"scenario": "isolated_one_two_three",
+			"zoom": 2.31
+		},
+		{
+			"camera_cell": [
+				20768,
+				10240
+			],
+			"camera_world": [
+				664592.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_isolated_one_two_three_3_0x.png",
+			"scenario": "isolated_one_two_three",
+			"zoom": 3.0
+		},
+		{
+			"camera_cell": [
+				20864,
+				10240
+			],
+			"camera_world": [
+				667664.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_mixed_height_adjacent_0_5x.png",
+			"scenario": "mixed_height_adjacent",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				20864,
+				10240
+			],
+			"camera_world": [
+				667664.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_mixed_height_adjacent_1_0x.png",
+			"scenario": "mixed_height_adjacent",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				20864,
+				10240
+			],
+			"camera_world": [
+				667664.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_mixed_height_adjacent_2_31x.png",
+			"scenario": "mixed_height_adjacent",
+			"zoom": 2.31
+		},
+		{
+			"camera_cell": [
+				20864,
+				10240
+			],
+			"camera_world": [
+				667664.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_mixed_height_adjacent_3_0x.png",
+			"scenario": "mixed_height_adjacent",
+			"zoom": 3.0
+		},
+		{
+			"camera_cell": [
+				20960,
+				10240
+			],
+			"camera_world": [
+				670736.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_dirt_stone_transition_0_5x.png",
+			"scenario": "dirt_stone_transition",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				20960,
+				10240
+			],
+			"camera_world": [
+				670736.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_dirt_stone_transition_1_0x.png",
+			"scenario": "dirt_stone_transition",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				20960,
+				10240
+			],
+			"camera_world": [
+				670736.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_dirt_stone_transition_2_31x.png",
+			"scenario": "dirt_stone_transition",
+			"zoom": 2.31
+		},
+		{
+			"camera_cell": [
+				20960,
+				10240
+			],
+			"camera_world": [
+				670736.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_dirt_stone_transition_3_0x.png",
+			"scenario": "dirt_stone_transition",
+			"zoom": 3.0
+		},
+		{
+			"camera_cell": [
+				21056,
+				10240
+			],
+			"camera_world": [
+				673808.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_user_diagonal_grass_reproduction_0_5x.png",
+			"scenario": "user_diagonal_grass_reproduction",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				21056,
+				10240
+			],
+			"camera_world": [
+				673808.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_user_diagonal_grass_reproduction_1_0x.png",
+			"scenario": "user_diagonal_grass_reproduction",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				21056,
+				10240
+			],
+			"camera_world": [
+				673808.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_user_diagonal_grass_reproduction_2_31x.png",
+			"scenario": "user_diagonal_grass_reproduction",
+			"zoom": 2.31
+		},
+		{
+			"camera_cell": [
+				21056,
+				10240
+			],
+			"camera_world": [
+				673808.0,
+				327696.0
+			],
+			"path": "res://screenshots/phase3e_baseline_user_diagonal_grass_reproduction_3_0x.png",
+			"scenario": "user_diagonal_grass_reproduction",
+			"zoom": 3.0
+		},
+		{
+			"camera_cell": [
+				32,
+				-20480
+			],
+			"camera_world": [
+				1040.0,
+				-655344.0
+			],
+			"path": "res://screenshots/phase3e_baseline_positive_chunk_seam_0_5x.png",
+			"scenario": "positive_chunk_seam",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				32,
+				-20480
+			],
+			"camera_world": [
+				1040.0,
+				-655344.0
+			],
+			"path": "res://screenshots/phase3e_baseline_positive_chunk_seam_1_0x.png",
+			"scenario": "positive_chunk_seam",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				32,
+				-20480
+			],
+			"camera_world": [
+				1040.0,
+				-655344.0
+			],
+			"path": "res://screenshots/phase3e_baseline_positive_chunk_seam_2_31x.png",
+			"scenario": "positive_chunk_seam",
+			"zoom": 2.31
+		},
+		{
+			"camera_cell": [
+				32,
+				-20480
+			],
+			"camera_world": [
+				1040.0,
+				-655344.0
+			],
+			"path": "res://screenshots/phase3e_baseline_positive_chunk_seam_3_0x.png",
+			"scenario": "positive_chunk_seam",
+			"zoom": 3.0
+		},
+		{
+			"camera_cell": [
+				-32,
+				-20480
+			],
+			"camera_world": [
+				-1008.0,
+				-655344.0
+			],
+			"path": "res://screenshots/phase3e_baseline_negative_chunk_seam_0_5x.png",
+			"scenario": "negative_chunk_seam",
+			"zoom": 0.5
+		},
+		{
+			"camera_cell": [
+				-32,
+				-20480
+			],
+			"camera_world": [
+				-1008.0,
+				-655344.0
+			],
+			"path": "res://screenshots/phase3e_baseline_negative_chunk_seam_1_0x.png",
+			"scenario": "negative_chunk_seam",
+			"zoom": 1.0
+		},
+		{
+			"camera_cell": [
+				-32,
+				-20480
+			],
+			"camera_world": [
+				-1008.0,
+				-655344.0
+			],
+			"path": "res://screenshots/phase3e_baseline_negative_chunk_seam_2_31x.png",
+			"scenario": "negative_chunk_seam",
+			"zoom": 2.31
+		},
+		{
+			"camera_cell": [
+				-32,
+				-20480
+			],
+			"camera_world": [
+				-1008.0,
+				-655344.0
+			],
+			"path": "res://screenshots/phase3e_baseline_negative_chunk_seam_3_0x.png",
+			"scenario": "negative_chunk_seam",
+			"zoom": 3.0
+		}
+	],
+	"display_server": "Windows",
+	"engine": "4.7-stable (official)",
+	"phase": "3E",
+	"phase3d_baseline": true,
+	"scenarios": [
+		{
+			"center": "(20480, 10240)",
+			"description": "Long stone diagonal spanning multiple streamed chunks.",
+			"kind": "controlled",
+			"label": "long_diagonal_multichunk"
+		},
+		{
+			"center": "(20576, 10240)",
+			"description": "S-shaped dirt boundary with alternating turns.",
+			"kind": "controlled",
+			"label": "s_winding_boundary"
+		},
+		{
+			"center": "(20672, 10240)",
+			"description": "Explicit convex spur and concave notch.",
+			"kind": "controlled",
+			"label": "convex_concave_corners"
+		},
+		{
+			"center": "(20768, 10240)",
+			"description": "Isolated one-, two-, and three-level formations.",
+			"kind": "controlled",
+			"label": "isolated_one_two_three"
+		},
+		{
+			"center": "(20864, 10240)",
+			"description": "Adjacent height-one, height-two, and height-three terraces.",
+			"kind": "controlled",
+			"label": "mixed_height_adjacent"
+		},
+		{
+			"center": "(20960, 10240)",
+			"description": "Unified contour crossing a dirt/stone material transition.",
+			"kind": "controlled",
+			"label": "dirt_stone_transition"
+		},
+		{
+			"center": "(21056, 10240)",
+			"description": "Prominent grass escarpment matching the reported 2.31x staircase case.",
+			"kind": "controlled",
+			"label": "user_diagonal_grass_reproduction"
+		},
+		{
+			"center": "(32, -20480)",
+			"description": "Diagonal grass cliff crossing positive chunk seams.",
+			"kind": "controlled",
+			"label": "positive_chunk_seam"
+		},
+		{
+			"center": "(-32, -20480)",
+			"description": "Diagonal grass cliff crossing negative chunk seams.",
+			"kind": "controlled",
+			"label": "negative_chunk_seam"
+		}
+	],
+	"unified_contours": false,
+	"viewport": [
+		1280,
+		720
+	],
+	"world_seed": 84521,
+	"zooms": [
+		0.5,
+		1.0,
+		2.31,
+		3.0
+	]
+}
