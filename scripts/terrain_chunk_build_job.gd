@@ -83,6 +83,8 @@ var _organic_refined_silhouettes_enabled: bool = false
 var _organic_connected_contours_enabled: bool = false
 var _organic_unified_contours_enabled: bool = false
 var _organic_profiling_enabled: bool = false
+var _organic_height_step: int = OrganicCliffMeshBuilder.BASELINE_HEIGHT_STEP
+var _directional_projection_enabled: bool = false
 
 var sampling_usec: int = 0
 var mask_usec: int = 0
@@ -154,7 +156,9 @@ func configure_organic_geometry(
         unified_components_enabled: bool, refined_silhouettes_enabled: bool,
         connected_contours_enabled: bool = false,
         unified_contours_enabled: bool = false,
-        revision: int = 0, profiling_enabled: bool = false) -> void:
+        revision: int = 0, profiling_enabled: bool = false,
+        height_step: int = OrganicCliffMeshBuilder.BASELINE_HEIGHT_STEP,
+        directional_projection_enabled: bool = false) -> void:
     organic_geometry_enabled = enabled
     organic_geometry_revision = revision
     _organic_world_seed = world_seed
@@ -164,6 +168,8 @@ func configure_organic_geometry(
     _organic_connected_contours_enabled = connected_contours_enabled
     _organic_unified_contours_enabled = unified_contours_enabled
     _organic_profiling_enabled = profiling_enabled
+    _organic_height_step = maxi(1, height_step)
+    _directional_projection_enabled = directional_projection_enabled
 
 
 func seed_organic_halo(ids: PackedInt32Array, heights: PackedByteArray) -> bool:
@@ -289,7 +295,8 @@ func process_organic_geometry_quantum(max_cells: int) -> int:
             _organic_refined_silhouettes_enabled,
             _organic_connected_contours_enabled,
             _organic_unified_contours_enabled,
-            _organic_profiling_enabled)
+            _organic_profiling_enabled, _organic_height_step,
+            _directional_projection_enabled)
     var started_usec: int = Time.get_ticks_usec()
     var processed: int = OrganicCliffMeshBuilder.process_incremental(
         organic_geometry_state, max_cells)

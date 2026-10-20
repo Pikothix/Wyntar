@@ -3,6 +3,7 @@ extends Node2D
 ## owns the shared masked atlases; TerrainWorld owns authoritative mutable data.
 
 signal authoritative_state_changed
+signal cliff_height_profile_changed(height_step: int)
 
 const Catalog = preload("res://scripts/terrain_catalog.gd")
 const TerrainGenerator = preload("res://scripts/terrain_generator.gd")
@@ -23,9 +24,17 @@ const ObliqueTerrainRenderer = preload("res://scripts/oblique_terrain_renderer.g
 const TILE_SIZE: Vector2i = Vector2i(32, 32)
 const CHUNK_SIZE: int = 32
 const HEIGHT_STEP: int = 16
+const MODERATE_HEIGHT_STEP: int = 24
+const PROMINENT_HEIGHT_STEP: int = 32
 const MAX_ELEVATION: int = TerrainWorld.MAX_ELEVATION
 const STAGED_EDIT_THRESHOLD: int = 96
 const STAGED_EDIT_CELLS_PER_FRAME: int = 32
+
+enum CliffHeightProfile {
+	BASELINE,
+	MODERATE,
+	PROMINENT,
+}
 
 var world_seed: int = 84521
 var biome_frequency: float = 0.012
@@ -56,12 +65,20 @@ var texture_variation_frequency: float = 0.0025
 var organic_boundaries_enabled: bool = true
 var organic_edge_strength: float = 0.08
 var organic_edge_frequency: float = 0.035
+var experimental_water_enhancement_enabled: bool = false
+var water_ripple_strength: float = 0.32
+var water_secondary_ripple_scale: float = 2.4
+var water_ripple_drift_speed: float = 0.55
+var water_glint_density: float = 0.14
+var water_glint_brightness: float = 0.38
 var procedural_cliff_materials_enabled: bool = true
 var organic_cliff_geometry_enabled: bool = false
 var unified_cliff_components_enabled: bool = false
 var refined_cliff_silhouettes_enabled: bool = false
 var connected_cliff_contours_enabled: bool = false
 var unified_cliff_contours_enabled: bool = false
+var directional_cliff_projection_enabled: bool = false
+var cliff_height_profile: int = CliffHeightProfile.BASELINE
 var oblique_presentation_enabled: bool = false
 var organic_oblique_refinement_enabled: bool = false
 var cliff_edge_overlays_visible: bool = true
@@ -217,6 +234,7 @@ func _ready() -> void:
 		environment_object_atlas_texture,
 		environment_object_atlas_by_id,
 		environment_object_unripe_atlas_by_id)
+	environment_object_renderer.set_height_step(get_cliff_height_step())
 	environment_object_renderer.set_objects_visible(environment_objects_enabled)
 	add_child(environment_object_renderer)
 	generator = TerrainGenerator.new()
@@ -1042,6 +1060,49 @@ func set_organic_boundaries_enabled(enabled: bool) -> void:
 		visual_material.set_shader_parameter("organic_boundaries_enabled", 1.0 if enabled else 0.0)
 
 
+func set_experimental_water_enhancement_enabled(enabled: bool) -> void:
+	## Presentation-only rollback switch. Shared materials update immediately;
+	## authoritative terrain and streamed chunk contents remain unchanged.
+	experimental_water_enhancement_enabled = enabled
+	for terrain_id in visual_material_by_id:
+		if bool(liquid_by_id.get(int(terrain_id), false)):
+			visual_material_by_id[terrain_id].set_shader_parameter(
+				"experimental_water_enhancement_enabled", 1.0 if enabled else 0.0)
+
+
+func set_water_enhancement_controls(
+		ripple_strength: float, secondary_scale: float, drift_speed: float,
+		glint_density: float, glint_brightness: float) -> void:
+	water_ripple_strength = clampf(ripple_strength, 0.0, 1.0)
+	water_secondary_ripple_scale = clampf(secondary_scale, 0.5, 6.0)
+	water_ripple_drift_speed = clampf(drift_speed, 0.0, 2.0)
+	water_glint_density = clampf(glint_density, 0.0, 1.0)
+	water_glint_brightness = clampf(glint_brightness, 0.0, 1.0)
+	for terrain_id in visual_material_by_id:
+		if bool(liquid_by_id.get(int(terrain_id), false)):
+			_apply_water_enhancement_parameters(visual_material_by_id[terrain_id])
+
+
+func set_water_animation_time_override(seconds: float) -> void:
+	## Capture/validation hook. Pass a negative value to restore global TIME.
+	for terrain_id in visual_material_by_id:
+		if bool(liquid_by_id.get(int(terrain_id), false)):
+			visual_material_by_id[terrain_id].set_shader_parameter(
+				"water_animation_time_override", seconds)
+
+
+func _apply_water_enhancement_parameters(material: ShaderMaterial) -> void:
+	material.set_shader_parameter(
+		"experimental_water_enhancement_enabled",
+		1.0 if experimental_water_enhancement_enabled else 0.0)
+	material.set_shader_parameter("water_ripple_strength", water_ripple_strength)
+	material.set_shader_parameter(
+		"water_secondary_ripple_scale", water_secondary_ripple_scale)
+	material.set_shader_parameter("water_ripple_drift_speed", water_ripple_drift_speed)
+	material.set_shader_parameter("water_glint_density", water_glint_density)
+	material.set_shader_parameter("water_glint_brightness", water_glint_brightness)
+
+
 func set_procedural_cliff_materials_enabled(enabled: bool) -> void:
 	## Presentation-only rollback switch. Atlas selection, chunk data and
 	## authoritative terrain remain unchanged.
@@ -1122,6 +1183,52 @@ func set_unified_cliff_contours_enabled(enabled: bool) -> void:
 		for chunk_coord in loaded_chunks:
 			_schedule_organic_cliff_rebuild(chunk_coord, true)
 	_restart_pending_stream_builds()
+
+
+func set_directional_cliff_projection_enabled(enabled: bool) -> void:
+	## Phase 3G comparison only. TerrainWorld and saved data are unchanged.
+	if directional_cliff_projection_enabled == enabled:
+		return
+	directional_cliff_projection_enabled = enabled
+	for chunk in loaded_chunks.values():
+		chunk.set_directional_cliff_projection_enabled(enabled)
+	if organic_cliff_geometry_enabled:
+		for chunk_coord in loaded_chunks:
+			_schedule_organic_cliff_rebuild(chunk_coord, true)
+	_restart_pending_stream_builds()
+
+
+func set_cliff_height_profile(profile: int) -> void:
+	## Phase 3F presentation-only projection. Authoritative heights and saves remain unchanged.
+	var clamped_profile: int = clampi(
+		profile, CliffHeightProfile.BASELINE, CliffHeightProfile.PROMINENT)
+	if cliff_height_profile == clamped_profile:
+		return
+	cliff_height_profile = clamped_profile
+	var height_step: int = get_cliff_height_step()
+	for chunk in loaded_chunks.values():
+		chunk.set_height_step(height_step)
+	if environment_object_renderer != null:
+		environment_object_renderer.set_height_step(height_step)
+	if organic_cliff_geometry_enabled:
+		for chunk_coord in loaded_chunks:
+			_schedule_organic_cliff_rebuild(chunk_coord, true)
+	_restart_pending_stream_builds()
+	cliff_height_profile_changed.emit(height_step)
+
+
+func get_cliff_height_profile() -> int:
+	return cliff_height_profile
+
+
+func get_cliff_height_step() -> int:
+	match cliff_height_profile:
+		CliffHeightProfile.MODERATE:
+			return MODERATE_HEIGHT_STEP
+		CliffHeightProfile.PROMINENT:
+			return PROMINENT_HEIGHT_STEP
+		_:
+			return HEIGHT_STEP
 
 
 func set_cliff_edge_overlays_visible(visible_value: bool) -> void:
@@ -1266,7 +1373,7 @@ func get_projected_cell_rect(world_pos: Vector2i) -> Rect2:
 		return Rect2(minimum, maximum - minimum)
 	var elevation: int = get_world_surface_elevation(world_pos)
 	return Rect2(
-		Vector2(world_pos * TILE_SIZE) - Vector2(0.0, float(elevation * HEIGHT_STEP)),
+		Vector2(world_pos * TILE_SIZE) - Vector2(0.0, float(elevation * get_cliff_height_step())),
 		Vector2(TILE_SIZE))
 
 
@@ -1296,7 +1403,8 @@ func pick_world_position(pixel_pos: Vector2, target_ground: bool = false) -> Dic
 		return _make_pick(flat_cell, get_world_elevation(flat_cell), false, 0, true)
 	var best_pick: Dictionary = {}
 	var best_score: int = -1
-	var vertical_reach: int = ceili(float(MAX_ELEVATION * HEIGHT_STEP) / TILE_SIZE.y) + 1
+	var height_step: int = get_cliff_height_step()
+	var vertical_reach: int = ceili(float(MAX_ELEVATION * height_step) / TILE_SIZE.y) + 1
 	for cell_y in range(flat_cell.y, flat_cell.y + vertical_reach + 1):
 		var candidate := Vector2i(flat_cell.x, cell_y)
 		var elevation: int = get_world_surface_elevation(candidate)
@@ -1315,8 +1423,8 @@ func pick_world_position(pixel_pos: Vector2, target_ground: bool = false) -> Dic
 		var face_rect := Rect2(
 			Vector2(
 				candidate.x * TILE_SIZE.x,
-				(candidate.y + 1) * TILE_SIZE.y - elevation * HEIGHT_STEP),
-			Vector2(TILE_SIZE.x, (elevation - south_elevation) * HEIGHT_STEP))
+				(candidate.y + 1) * TILE_SIZE.y - elevation * height_step),
+			Vector2(TILE_SIZE.x, (elevation - south_elevation) * height_step))
 		var score: int = elevation * 10
 		if face_rect.has_point(pixel_pos) and score > best_score:
 			best_score = score
@@ -1366,7 +1474,8 @@ func _begin_job_population(job) -> void:
 		connected_cliff_contours_enabled,
 		unified_cliff_contours_enabled,
 		world_seed,
-		organic_cliff_material, job.max_elevation_present)
+		organic_cliff_material, job.max_elevation_present, get_cliff_height_step(),
+		directional_cliff_projection_enabled)
 	chunk.set_cliff_edge_overlays_visible(cliff_edge_overlays_visible)
 	chunk.set_cliff_shadows_visible(cliff_shadows_visible)
 	chunk.visible = not oblique_presentation_enabled
@@ -1464,7 +1573,8 @@ func _create_build_job(chunk_coord: Vector2i):
 		unified_cliff_components_enabled, refined_cliff_silhouettes_enabled,
 		connected_cliff_contours_enabled,
 		unified_cliff_contours_enabled,
-		int(_organic_geometry_revisions.get(chunk_coord, 0)), profiling_enabled)
+		int(_organic_geometry_revisions.get(chunk_coord, 0)), profiling_enabled,
+		get_cliff_height_step(), directional_cliff_projection_enabled)
 	return job
 
 
@@ -1487,7 +1597,8 @@ func _schedule_organic_cliff_rebuild(
 		unified_cliff_components_enabled, refined_cliff_silhouettes_enabled,
 		connected_cliff_contours_enabled,
 		unified_cliff_contours_enabled,
-		revision, profiling_enabled)
+		revision, profiling_enabled, get_cliff_height_step(),
+		directional_cliff_projection_enabled)
 	if reuse_cached_halo and _organic_halo_cache.has(chunk_coord):
 		var cached: Dictionary = _organic_halo_cache[chunk_coord]
 		if int(cached.revision) == int(_organic_terrain_revisions.get(chunk_coord, 0)):
@@ -2208,6 +2319,7 @@ func _create_visual_material(material_definition: Dictionary) -> ShaderMaterial:
 			"liquid_emissive_strength", clampf(float(
 				material_definition.get("emissive_strength", 0.0)), 0.0, 1.0)
 				if bool(material_definition.get("emissive", false)) else 0.0)
+		_apply_water_enhancement_parameters(shader_material)
 	return shader_material
 
 

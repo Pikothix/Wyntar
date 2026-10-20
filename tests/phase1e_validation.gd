@@ -129,6 +129,8 @@ func _test_runtime_selection_and_editing() -> void:
 	terrain = demo.terrain
 	terrain.set_decoration_generation_enabled(false)
 	terrain.set_environment_object_generation_enabled(false)
+	# Isolate the Phase 1E silhouette path now that main.tscn selects Phase 3E.
+	terrain.set_unified_cliff_contours_enabled(false)
 	for y in range(2, 12):
 		for x in range(24, 41):
 			terrain.world.set_override(Vector2i(x, y), 2)

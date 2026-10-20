@@ -53,6 +53,14 @@ const DEMO_CENTER: Vector2 = Vector2(16.0, 16.0)
 @export_range(0.0, 0.18, 0.005) var organic_edge_strength: float = 0.08
 @export_range(0.005, 0.1, 0.001) var organic_edge_frequency: float = 0.035
 
+@export_group("Experimental Water Enhancement")
+@export var experimental_water_enhancement_enabled: bool = false
+@export_range(0.0, 1.0, 0.01) var water_ripple_strength: float = 0.32
+@export_range(0.5, 6.0, 0.1) var water_secondary_ripple_scale: float = 2.4
+@export_range(0.0, 2.0, 0.05) var water_ripple_drift_speed: float = 0.55
+@export_range(0.0, 1.0, 0.01) var water_glint_density: float = 0.14
+@export_range(0.0, 1.0, 0.01) var water_glint_brightness: float = 0.38
+
 @export_group("Cliff Materials")
 @export var procedural_cliff_materials_enabled: bool = true
 @export var organic_cliff_geometry_enabled: bool = true
@@ -60,6 +68,9 @@ const DEMO_CENTER: Vector2 = Vector2(16.0, 16.0)
 @export var refined_cliff_silhouettes_enabled: bool = true
 @export var connected_cliff_contours_enabled: bool = true
 @export var unified_cliff_contours_enabled: bool = false
+## Phase 3G comparison; keep disabled until visual acceptance.
+@export var directional_cliff_projection_enabled: bool = false
+@export_enum("Baseline:0", "Moderate:1", "Prominent:2") var cliff_height_profile: int = 0
 
 @export_group("Experimental 2.5D Presentation")
 @export var oblique_presentation_enabled: bool = false
@@ -159,12 +170,20 @@ func _ready() -> void:
 	terrain.organic_boundaries_enabled = organic_boundaries_enabled
 	terrain.organic_edge_strength = organic_edge_strength
 	terrain.organic_edge_frequency = organic_edge_frequency
+	terrain.experimental_water_enhancement_enabled = experimental_water_enhancement_enabled
+	terrain.water_ripple_strength = clampf(water_ripple_strength, 0.0, 1.0)
+	terrain.water_secondary_ripple_scale = clampf(water_secondary_ripple_scale, 0.5, 6.0)
+	terrain.water_ripple_drift_speed = clampf(water_ripple_drift_speed, 0.0, 2.0)
+	terrain.water_glint_density = clampf(water_glint_density, 0.0, 1.0)
+	terrain.water_glint_brightness = clampf(water_glint_brightness, 0.0, 1.0)
 	terrain.procedural_cliff_materials_enabled = procedural_cliff_materials_enabled
 	terrain.organic_cliff_geometry_enabled = organic_cliff_geometry_enabled
 	terrain.unified_cliff_components_enabled = unified_cliff_components_enabled
 	terrain.refined_cliff_silhouettes_enabled = refined_cliff_silhouettes_enabled
 	terrain.connected_cliff_contours_enabled = connected_cliff_contours_enabled
 	terrain.unified_cliff_contours_enabled = unified_cliff_contours_enabled
+	terrain.directional_cliff_projection_enabled = directional_cliff_projection_enabled
+	terrain.cliff_height_profile = cliff_height_profile
 	terrain.oblique_presentation_enabled = oblique_presentation_enabled
 	terrain.organic_oblique_refinement_enabled = organic_oblique_refinement_enabled
 	terrain.cliff_edge_overlays_visible = cliff_edge_overlays_visible
@@ -185,10 +204,11 @@ func _ready() -> void:
 
 	cursor = CursorOverlay.new()
 	cursor.z_index = 100
-	cursor.height_step = TerrainRenderer.HEIGHT_STEP
+	cursor.height_step = terrain.get_cliff_height_step()
 	cursor.height_lookup = terrain.get_world_surface_elevation
 	cursor.cell_polygon_lookup = terrain.get_projected_cell_polygon
 	terrain.add_child(cursor)
+	terrain.cliff_height_profile_changed.connect(_on_cliff_height_profile_changed)
 
 	editor = WorldEditorController.new()
 	editor.configure(terrain)
@@ -556,6 +576,14 @@ func _mark_world_dirty() -> void:
 	_update_save_status("Unsaved changes")
 
 
+func _on_cliff_height_profile_changed(height_step: int) -> void:
+	if cursor == null:
+		return
+	cliff_height_profile = terrain.get_cliff_height_profile()
+	cursor.height_step = float(height_step)
+	cursor.queue_redraw()
+
+
 func _update_save_status(status: String = "") -> void:
 	if save_status_label == null:
 		return
@@ -619,12 +647,20 @@ func _replace_world_from_snapshot(snapshot: Dictionary) -> Dictionary:
 	replacement.organic_boundaries_enabled = organic_boundaries_enabled
 	replacement.organic_edge_strength = organic_edge_strength
 	replacement.organic_edge_frequency = organic_edge_frequency
+	replacement.experimental_water_enhancement_enabled = experimental_water_enhancement_enabled
+	replacement.water_ripple_strength = water_ripple_strength
+	replacement.water_secondary_ripple_scale = water_secondary_ripple_scale
+	replacement.water_ripple_drift_speed = water_ripple_drift_speed
+	replacement.water_glint_density = water_glint_density
+	replacement.water_glint_brightness = water_glint_brightness
 	replacement.procedural_cliff_materials_enabled = procedural_cliff_materials_enabled
 	replacement.organic_cliff_geometry_enabled = organic_cliff_geometry_enabled
 	replacement.unified_cliff_components_enabled = unified_cliff_components_enabled
 	replacement.refined_cliff_silhouettes_enabled = refined_cliff_silhouettes_enabled
 	replacement.connected_cliff_contours_enabled = connected_cliff_contours_enabled
 	replacement.unified_cliff_contours_enabled = unified_cliff_contours_enabled
+	replacement.directional_cliff_projection_enabled = terrain.directional_cliff_projection_enabled
+	replacement.cliff_height_profile = cliff_height_profile
 	replacement.oblique_presentation_enabled = oblique_presentation_enabled
 	replacement.organic_oblique_refinement_enabled = organic_oblique_refinement_enabled
 	replacement.cliff_edge_overlays_visible = cliff_edge_overlays_visible
@@ -645,11 +681,13 @@ func _replace_world_from_snapshot(snapshot: Dictionary) -> Dictionary:
 	replacement.add_child(cursor)
 	cursor.height_lookup = replacement.get_world_surface_elevation
 	cursor.cell_polygon_lookup = replacement.get_projected_cell_polygon
+	cursor.height_step = replacement.get_cliff_height_step()
 	terrain = replacement
 	editor.configure(terrain)
 	editor.reset_runtime_state()
 	resource_interaction.configure(terrain)
 	terrain.authoritative_state_changed.connect(_mark_world_dirty)
+	terrain.cliff_height_profile_changed.connect(_on_cliff_height_profile_changed)
 	terrain.resource_state_manager.inventory_changed.connect(_on_resource_inventory_changed)
 	terrain.resource_state_manager.resource_changed.connect(_on_resource_state_changed)
 	old_terrain.visible = false

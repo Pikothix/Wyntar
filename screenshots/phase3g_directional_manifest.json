@@ -1,0 +1,508 @@
+{
+	"captures": [
+		{
+			"camera_world": [
+				786448.0,
+				399376.0
+			],
+			"path": "res://screenshots/phase3g_directional_recessed_sand_lake_1_0x.png",
+			"scenario": "recessed_sand_lake",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				786448.0,
+				399376.0
+			],
+			"path": "res://screenshots/phase3g_directional_recessed_sand_lake_2_31x.png",
+			"scenario": "recessed_sand_lake",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				786448.0,
+				399376.0
+			],
+			"path": "res://screenshots/phase3g_directional_recessed_sand_lake_3_0x.png",
+			"scenario": "recessed_sand_lake",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				789520.0,
+				399376.0
+			],
+			"path": "res://screenshots/phase3g_directional_equal_height_lake_1_0x.png",
+			"scenario": "equal_height_lake",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				789520.0,
+				399376.0
+			],
+			"path": "res://screenshots/phase3g_directional_equal_height_lake_2_31x.png",
+			"scenario": "equal_height_lake",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				789520.0,
+				399376.0
+			],
+			"path": "res://screenshots/phase3g_directional_equal_height_lake_3_0x.png",
+			"scenario": "equal_height_lake",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				786448.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_one_level_grass_plateau_1_0x.png",
+			"scenario": "one_level_grass_plateau",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				786448.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_one_level_grass_plateau_2_31x.png",
+			"scenario": "one_level_grass_plateau",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				786448.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_one_level_grass_plateau_3_0x.png",
+			"scenario": "one_level_grass_plateau",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				789520.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_two_level_raised_landmass_1_0x.png",
+			"scenario": "two_level_raised_landmass",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				789520.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_two_level_raised_landmass_2_31x.png",
+			"scenario": "two_level_raised_landmass",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				789520.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_two_level_raised_landmass_3_0x.png",
+			"scenario": "two_level_raised_landmass",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				792592.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_three_level_cliff_1_0x.png",
+			"scenario": "three_level_cliff",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				792592.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_three_level_cliff_2_31x.png",
+			"scenario": "three_level_cliff",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				792592.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_three_level_cliff_3_0x.png",
+			"scenario": "three_level_cliff",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				795664.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_long_diagonal_escarpment_1_0x.png",
+			"scenario": "long_diagonal_escarpment",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				795664.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_long_diagonal_escarpment_2_31x.png",
+			"scenario": "long_diagonal_escarpment",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				795664.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_long_diagonal_escarpment_3_0x.png",
+			"scenario": "long_diagonal_escarpment",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				798736.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_winding_cliff_1_0x.png",
+			"scenario": "winding_cliff",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				798736.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_winding_cliff_2_31x.png",
+			"scenario": "winding_cliff",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				798736.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_winding_cliff_3_0x.png",
+			"scenario": "winding_cliff",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				801808.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_convex_concave_corners_1_0x.png",
+			"scenario": "convex_concave_corners",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				801808.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_convex_concave_corners_2_31x.png",
+			"scenario": "convex_concave_corners",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				801808.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_convex_concave_corners_3_0x.png",
+			"scenario": "convex_concave_corners",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				804880.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_narrow_ridges_1_0x.png",
+			"scenario": "narrow_ridges",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				804880.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_narrow_ridges_2_31x.png",
+			"scenario": "narrow_ridges",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				804880.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_narrow_ridges_3_0x.png",
+			"scenario": "narrow_ridges",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				807952.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_isolated_formations_1_0x.png",
+			"scenario": "isolated_formations",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				807952.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_isolated_formations_2_31x.png",
+			"scenario": "isolated_formations",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				807952.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_isolated_formations_3_0x.png",
+			"scenario": "isolated_formations",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				811024.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_mixed_height_junctions_1_0x.png",
+			"scenario": "mixed_height_junctions",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				811024.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_mixed_height_junctions_2_31x.png",
+			"scenario": "mixed_height_junctions",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				811024.0,
+				393232.0
+			],
+			"path": "res://screenshots/phase3g_directional_mixed_height_junctions_3_0x.png",
+			"scenario": "mixed_height_junctions",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				1040.0,
+				-786416.0
+			],
+			"path": "res://screenshots/phase3g_directional_positive_chunk_boundary_1_0x.png",
+			"scenario": "positive_chunk_boundary",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				1040.0,
+				-786416.0
+			],
+			"path": "res://screenshots/phase3g_directional_positive_chunk_boundary_2_31x.png",
+			"scenario": "positive_chunk_boundary",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				1040.0,
+				-786416.0
+			],
+			"path": "res://screenshots/phase3g_directional_positive_chunk_boundary_3_0x.png",
+			"scenario": "positive_chunk_boundary",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				-1008.0,
+				-786416.0
+			],
+			"path": "res://screenshots/phase3g_directional_negative_chunk_boundary_1_0x.png",
+			"scenario": "negative_chunk_boundary",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				-1008.0,
+				-786416.0
+			],
+			"path": "res://screenshots/phase3g_directional_negative_chunk_boundary_2_31x.png",
+			"scenario": "negative_chunk_boundary",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				-1008.0,
+				-786416.0
+			],
+			"path": "res://screenshots/phase3g_directional_negative_chunk_boundary_3_0x.png",
+			"scenario": "negative_chunk_boundary",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				792592.0,
+				399376.0
+			],
+			"path": "res://screenshots/phase3g_directional_snow_plateau_1_0x.png",
+			"scenario": "snow_plateau",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				792592.0,
+				399376.0
+			],
+			"path": "res://screenshots/phase3g_directional_snow_plateau_2_31x.png",
+			"scenario": "snow_plateau",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				792592.0,
+				399376.0
+			],
+			"path": "res://screenshots/phase3g_directional_snow_plateau_3_0x.png",
+			"scenario": "snow_plateau",
+			"zoom": 3.0
+		},
+		{
+			"camera_world": [
+				795664.0,
+				399376.0
+			],
+			"path": "res://screenshots/phase3g_directional_south_facing_diagonal_1_0x.png",
+			"scenario": "south_facing_diagonal",
+			"zoom": 1.0
+		},
+		{
+			"camera_world": [
+				795664.0,
+				399376.0
+			],
+			"path": "res://screenshots/phase3g_directional_south_facing_diagonal_2_31x.png",
+			"scenario": "south_facing_diagonal",
+			"zoom": 2.31
+		},
+		{
+			"camera_world": [
+				795664.0,
+				399376.0
+			],
+			"path": "res://screenshots/phase3g_directional_south_facing_diagonal_3_0x.png",
+			"scenario": "south_facing_diagonal",
+			"zoom": 3.0
+		}
+	],
+	"directional": true,
+	"height_step": 32,
+	"scenarios": [
+		{
+			"center": "(24576, 12480)",
+			"description": "Water 0, surrounding sand 2.",
+			"kind": "controlled",
+			"label": "recessed_sand_lake"
+		},
+		{
+			"center": "(24672, 12480)",
+			"description": "Water and sand both 0: no cliff.",
+			"kind": "controlled",
+			"label": "equal_height_lake"
+		},
+		{
+			"center": "(24576, 12288)",
+			"description": "One-level grass plateau.",
+			"kind": "controlled",
+			"label": "one_level_grass_plateau"
+		},
+		{
+			"center": "(24672, 12288)",
+			"description": "Two-level raised grass landmass.",
+			"kind": "controlled",
+			"label": "two_level_raised_landmass"
+		},
+		{
+			"center": "(24768, 12288)",
+			"description": "Three-level stone cliff.",
+			"kind": "controlled",
+			"label": "three_level_cliff"
+		},
+		{
+			"center": "(24864, 12288)",
+			"description": "Long diagonal organic escarpment.",
+			"kind": "controlled",
+			"label": "long_diagonal_escarpment"
+		},
+		{
+			"center": "(24960, 12288)",
+			"description": "Winding cliff with alternating turns.",
+			"kind": "controlled",
+			"label": "winding_cliff"
+		},
+		{
+			"center": "(25056, 12288)",
+			"description": "Convex spur and concave notch.",
+			"kind": "controlled",
+			"label": "convex_concave_corners"
+		},
+		{
+			"center": "(25152, 12288)",
+			"description": "Narrow connected multi-height ridges.",
+			"kind": "controlled",
+			"label": "narrow_ridges"
+		},
+		{
+			"center": "(25248, 12288)",
+			"description": "Small isolated one-, two-, and three-level formations.",
+			"kind": "controlled",
+			"label": "isolated_formations"
+		},
+		{
+			"center": "(25344, 12288)",
+			"description": "Mixed-height junctions and terraces.",
+			"kind": "controlled",
+			"label": "mixed_height_junctions"
+		},
+		{
+			"center": "(32, -24576)",
+			"description": "Cliff crossing a positive chunk seam.",
+			"kind": "controlled",
+			"label": "positive_chunk_boundary"
+		},
+		{
+			"center": "(-32, -24576)",
+			"description": "Cliff crossing a negative chunk seam.",
+			"kind": "controlled",
+			"label": "negative_chunk_boundary"
+		},
+		{
+			"center": "(24768, 12480)",
+			"description": "Three-level snow plateau.",
+			"kind": "controlled",
+			"label": "snow_plateau"
+		},
+		{
+			"center": "(24864, 12480)",
+			"description": "Mirrored escarpment facing the camera.",
+			"kind": "controlled",
+			"label": "south_facing_diagonal"
+		}
+	],
+	"seed": 84521,
+	"viewport": [
+		1280,
+		720
+	]
+}

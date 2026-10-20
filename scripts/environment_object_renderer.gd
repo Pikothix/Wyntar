@@ -5,7 +5,7 @@ extends Node2D
 
 const ObjectLayer = preload("res://scripts/environment_object_layer.gd")
 const TILE_SIZE := Vector2i(32, 32)
-const HEIGHT_STEP: int = 16
+const BASELINE_HEIGHT_STEP: int = 16
 const MAX_ELEVATION: int = 3
 
 var _definitions_by_id: Dictionary
@@ -20,6 +20,7 @@ var _category_counts: Dictionary = {}
 var _occupied_ground_cells: Dictionary = {}
 var last_submission_usec: int = 0
 var _batches_dirty: bool = false
+var _height_step: int = BASELINE_HEIGHT_STEP
 
 
 func configure(
@@ -83,6 +84,14 @@ func set_atlas_texture(atlas_texture: Texture2D) -> void:
     _atlas_texture = atlas_texture
     for layer in _layers:
         layer.set_atlas_texture(atlas_texture)
+
+
+func set_height_step(height_step: int) -> void:
+    var value: int = maxi(1, height_step)
+    if _height_step == value:
+        return
+    _height_step = value
+    _batches_dirty = true
 
 
 func get_visible_object_count() -> int:
@@ -203,7 +212,7 @@ func _rebuild_batches() -> void:
                 _occupied_ground_cells[anchor + Vector2i(footprint_offset)] = true
             var root_position := Vector2(
                 anchor.x * TILE_SIZE.x + TILE_SIZE.x * 0.5,
-                (anchor.y + 1) * TILE_SIZE.y - elevation * HEIGHT_STEP)
+                (anchor.y + 1) * TILE_SIZE.y - elevation * _height_step)
             items_by_elevation[elevation].append({
                 "id": object_id,
                 "variant": int(variants[index]),

@@ -9,7 +9,7 @@ const DecorationPlacement = preload("res://scripts/decoration_placement.gd")
 
 const CHUNK_SIZE: int = 32
 const TILE_SIZE: Vector2i = Vector2i(32, 32)
-const HEIGHT_STEP: int = 16
+const BASELINE_HEIGHT_STEP: int = 16
 const SLOT_COUNT: int = 4
 const MAX_ELEVATION: int = TerrainWorld.MAX_ELEVATION
 const CORNER_OFFSETS = [
@@ -51,6 +51,8 @@ var _cliff_edge_overlays_visible: bool = true
 var _cliff_shadows_visible: bool = true
 var _organic_cliff_world_seed: int = 0
 var _organic_cliff_material: Material
+var _height_step: int = BASELINE_HEIGHT_STEP
+var _directional_projection_enabled: bool = false
 var _organic_geometry_ready: bool = false
 var _active_max_elevation: int = 0
 var profiling_enabled: bool = false
@@ -96,7 +98,9 @@ func configure(
         unified_cliff_contours_enabled: bool,
         organic_cliff_world_seed: int,
         organic_cliff_material: Material,
-        initial_max_elevation: int = 0) -> void:
+        initial_max_elevation: int = 0,
+        height_step: int = BASELINE_HEIGHT_STEP,
+        directional_projection_enabled: bool = false) -> void:
     var profile_start: int = Time.get_ticks_usec() if profiling_enabled else 0
     chunk_coord = coord
     priority_by_id = priorities
@@ -119,6 +123,8 @@ func configure(
     _unified_cliff_contours_enabled = unified_cliff_contours_enabled
     _organic_cliff_world_seed = organic_cliff_world_seed
     _organic_cliff_material = organic_cliff_material
+    _height_step = maxi(1, height_step)
+    _directional_projection_enabled = directional_projection_enabled
     position = Vector2(coord * CHUNK_SIZE * TILE_SIZE)
     name = "TerrainChunk_%d_%d" % [coord.x, coord.y]
 
@@ -312,7 +318,8 @@ func rebuild_organic_cliffs() -> void:
         chunk_coord, MAX_ELEVATION, _organic_cliff_world_seed,
         _world_lookup, _height_lookup, liquid_by_id,
         _unified_cliff_components_enabled, _refined_cliff_silhouettes_enabled,
-        _connected_cliff_contours_enabled, _unified_cliff_contours_enabled)
+        _connected_cliff_contours_enabled, _unified_cliff_contours_enabled,
+        _height_step, _directional_projection_enabled)
     organic_cliff_geometry_usec = int(result.build_usec)
     organic_cliff_face_count = int(result.face_count)
     organic_cliff_vertex_count = int(result.vertex_count)
@@ -323,7 +330,7 @@ func rebuild_organic_cliffs() -> void:
     organic_cliff_material_query_count = int(result.material_query_count)
     _assign_organic_meshes(
             result.meshes, organic_cliff_mesh_layers,
-            3 if _unified_cliff_contours_enabled else -2,
+            _organic_face_z_offset(),
             "OrganicCliffsHeight")
     if _unified_cliff_components_enabled:
         _assign_organic_meshes(
@@ -365,7 +372,7 @@ func apply_prepared_organic_cliffs(result: Dictionary) -> int:
     organic_cliff_mesh_resource_usec = int(result.get("mesh_resource_usec", 0))
     _assign_organic_meshes(
             result.get("meshes", []), organic_cliff_mesh_layers,
-            3 if _unified_cliff_contours_enabled else -2,
+            _organic_face_z_offset(),
             "OrganicCliffsHeight")
     if _unified_cliff_components_enabled:
         _assign_organic_meshes(
@@ -423,6 +430,43 @@ func set_unified_cliff_contours_enabled(enabled: bool) -> void:
     if _unified_cliff_contours_enabled == enabled:
         return
     _unified_cliff_contours_enabled = enabled
+    mark_organic_cliff_geometry_pending()
+
+
+func _organic_face_z_offset() -> int:
+    # Phase 3G keeps complete coverage behind the owning upper surface. Lower
+    # terraces remain behind the whole drop, preserving Phase 3E band batching.
+    if _unified_cliff_contours_enabled:
+        return -1 if _directional_projection_enabled else 3
+    return -2
+
+
+func set_directional_cliff_projection_enabled(enabled: bool) -> void:
+    # Keep the accepted mesh visible until its revision-gated replacement commits.
+    _directional_projection_enabled = enabled
+
+
+func set_height_step(height_step: int) -> void:
+    ## Presentation-only projection. Existing authority and cell membership are unchanged.
+    var value: int = maxi(1, height_step)
+    if _height_step == value:
+        return
+    _height_step = value
+    for elevation_index in range(elevated_layers.size()):
+        var elevation: int = elevation_index + 1
+        var edge_layer = cliff_edge_layers[elevation_index]
+        if edge_layer != null:
+            edge_layer.position = Vector2(0.0, -elevation * _height_step)
+        var surface_group = elevated_layers[elevation_index]
+        if surface_group != null:
+            for surface_layer in surface_group:
+                surface_layer.position = Vector2(
+                    -TILE_SIZE.x / 2.0,
+                    -TILE_SIZE.y / 2.0 - elevation * _height_step)
+    for elevation in range(decoration_layers.size()):
+        var decoration_layer = decoration_layers[elevation]
+        if decoration_layer != null:
+            decoration_layer.position = Vector2(0.0, -elevation * _height_step)
     mark_organic_cliff_geometry_pending()
 
 
@@ -757,7 +801,7 @@ func _ensure_height_layers(elevation: int) -> void:
     cliff_layer.visible = not _organic_cliff_geometry_enabled
     cliff_layers[index] = cliff_layer
     var edge_layer := _create_layer("CliffEdgesHeight_%d" % elevation, _cliff_edge_tileset)
-    edge_layer.position = Vector2(0.0, -elevation * HEIGHT_STEP)
+    edge_layer.position = Vector2(0.0, -elevation * _height_step)
     # Crisp ledge lips sit above this elevation's four surface layers. The next
     # elevation band still occludes them where projected surfaces overlap.
     edge_layer.z_index = elevation * 8 + 4
@@ -769,7 +813,7 @@ func _ensure_height_layers(elevation: int) -> void:
             "SurfaceHeight_%dDepth_%d" % [elevation, depth], _surface_tileset)
         surface_layer.position = Vector2(
             -TILE_SIZE.x / 2.0,
-            -TILE_SIZE.y / 2.0 - elevation * HEIGHT_STEP)
+            -TILE_SIZE.y / 2.0 - elevation * _height_step)
         surface_layer.z_index = elevation * 8 + depth
         surface_group.append(surface_layer)
     elevated_layers[index] = surface_group
@@ -866,7 +910,7 @@ func _ensure_decoration_layer(elevation: int) -> void:
         return
     var layer := _create_layer(
         "DecorationsHeight_%d" % elevation, _decoration_tileset)
-    layer.position = Vector2(0.0, -elevation * HEIGHT_STEP)
+    layer.position = Vector2(0.0, -elevation * _height_step)
     layer.z_index = 4 if elevation == 0 else elevation * 8 + 5
     layer.visible = _decorations_visible
     decoration_layers[elevation] = layer

@@ -20,6 +20,9 @@ const MATERIALS = [
         "liquid_surface_tint": "66aeca", "liquid_highlight_tint": "b8edf0",
         "liquid_pattern_frequency": 0.010, "liquid_shimmer_strength": 0.065,
         "liquid_motion_enabled": true, "liquid_motion_speed": 0.18,
+        "water_ripple_strength": 0.32, "water_secondary_ripple_scale": 2.4,
+        "water_ripple_drift_speed": 0.55, "water_glint_density": 0.14,
+        "water_glint_brightness": 0.38,
         "shoreline_width": 0.16, "depth_effect_strength": 0.10,
         "emissive": false, "emissive_strength": 0.0,
         "variants": [

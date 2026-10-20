@@ -5,7 +5,7 @@ extends RefCounted
 
 const CHUNK_SIZE := 32
 const TILE_SIZE := 32
-const HEIGHT_STEP := 16
+const BASELINE_HEIGHT_STEP := 16
 const PROFILE_STEP := 16
 const COLUMN_COUNT := TILE_SIZE / PROFILE_STEP
 const CONNECTED_PROFILE_STEP := 8
@@ -24,7 +24,9 @@ static func build(
 		unified_components_enabled: bool = false,
 		refined_silhouettes_enabled: bool = false,
 		connected_contours_enabled: bool = false,
-		unified_contours_enabled: bool = false) -> Dictionary:
+		unified_contours_enabled: bool = false,
+		height_step: int = BASELINE_HEIGHT_STEP,
+		directional_projection_enabled: bool = false) -> Dictionary:
 	var started_usec: int = Time.get_ticks_usec()
 	var sampling_started_usec: int = Time.get_ticks_usec()
 	# One bounded halo read replaces repeated height/material callbacks from the
@@ -45,7 +47,8 @@ static func build(
 	var state: Dictionary = create_incremental(
 		chunk_coord, max_elevation, world_seed, halo_ids, halo_heights,
 		liquid_by_id, unified_components_enabled, refined_silhouettes_enabled,
-		connected_contours_enabled, unified_contours_enabled, true)
+		connected_contours_enabled, unified_contours_enabled, true, height_step,
+		directional_projection_enabled)
 	process_incremental(state, CHUNK_SIZE * CHUNK_SIZE)
 	var result: Dictionary = finalize_incremental(state)
 	result.sampling_usec = sampling_usec
@@ -62,7 +65,9 @@ static func create_incremental(
 		refined_silhouettes_enabled: bool,
 		connected_contours_enabled: bool = false,
 		unified_contours_enabled: bool = false,
-		profiling_enabled: bool = false) -> Dictionary:
+		profiling_enabled: bool = false,
+		height_step: int = BASELINE_HEIGHT_STEP,
+		directional_projection_enabled: bool = false) -> Dictionary:
 	## The caller owns the immutable 34x34 snapshot. All mutable state below is
 	## presentation-only and can be discarded safely when a chunk is invalidated.
 	return {
@@ -76,6 +81,8 @@ static func create_incremental(
 		"refined_silhouettes_enabled": refined_silhouettes_enabled,
 		"connected_contours_enabled": connected_contours_enabled,
 		"unified_contours_enabled": unified_contours_enabled,
+		"height_step": maxi(1, height_step),
+		"directional_projection_enabled": directional_projection_enabled,
 		"profiling_enabled": profiling_enabled,
 		"cell_index": 0,
 		"buffers": {},
@@ -193,7 +200,7 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 			left_connected, right_connected,
 			west_south_height, west_height, east_south_height, east_height,
 			bool(state.connected_contours_enabled),
-			left_run_connected, right_run_connected,
+			left_run_connected, right_run_connected, int(state.height_step),
 			state.profile_metrics)
 		var geometry_elapsed_usec: int = (
 			Time.get_ticks_usec() - geometry_started_usec if profiling_enabled else 0)
@@ -212,7 +219,8 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 				owner_height, south_height, source_id, int(state.world_seed),
 				left_foot_connected, right_foot_connected,
 				bool(state.connected_contours_enabled),
-				left_run_connected, right_run_connected, state.profile_metrics)
+				left_run_connected, right_run_connected, int(state.height_step),
+				state.profile_metrics)
 			geometry_elapsed_usec = (
 				Time.get_ticks_usec() - geometry_started_usec if profiling_enabled else 0)
 			vertex_elapsed_usec = (
@@ -233,7 +241,8 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 			int(halo_ids[north_index]), int(halo_ids[west_index]),
 			int(halo_ids[east_index]), bool(state.refined_silhouettes_enabled),
 			left_top_connected, right_top_connected,
-			bool(state.connected_contours_enabled), state.profile_metrics)
+			bool(state.connected_contours_enabled), int(state.height_step),
+			state.profile_metrics)
 		var geometry_elapsed_usec: int = (
 			Time.get_ticks_usec() - geometry_started_usec if profiling_enabled else 0)
 		var vertex_elapsed_usec: int = (
@@ -293,11 +302,12 @@ static func _process_unified_contour_square(
 		for segment in segments:
 			var path: PackedVector2Array = _unified_contour_path(
 				segment, mask, local_x, local_y, world_cell, level,
-				int(state.world_seed))
+				int(state.world_seed), int(state.height_step))
 			var triangles_before: int = state.buffers[render_elevation].indices.size() / 3
 			_append_unified_contour_band(
 				state.buffers[render_elevation], path, source_id, world_cell, level,
-				state.profile_metrics)
+				int(state.height_step), state.profile_metrics,
+				bool(state.directional_projection_enabled))
 			state.triangle_count += (
 				state.buffers[render_elevation].indices.size() / 3 - triangles_before)
 			state.face_count += 1
@@ -313,7 +323,7 @@ static func _process_unified_contour_square(
 					triangles_before = state.buffers[render_elevation].indices.size() / 3
 					_append_unified_contour_shadow(
 						state.buffers[render_elevation], path, source_id, world_cell,
-						level, state.profile_metrics)
+						level, int(state.height_step), state.profile_metrics)
 					state.triangle_count += (
 						state.buffers[render_elevation].indices.size() / 3 - triangles_before)
 					state.shadow_count += 1
@@ -371,7 +381,7 @@ static func _unified_contour_segments(
 
 static func _unified_contour_path(
 		segment: Array, mask: int, local_x: int, local_y: int, world_cell: Vector2i,
-		level: int, world_seed: int) -> PackedVector2Array:
+		level: int, world_seed: int, height_step: int = BASELINE_HEIGHT_STEP) -> PackedVector2Array:
 	var first: Vector2 = _unified_edge_point(
 		int(segment[0]), local_x, local_y, world_cell, world_seed)
 	var last: Vector2 = _unified_edge_point(
@@ -412,7 +422,7 @@ static func _unified_contour_path(
 		var bow: int = 2 if (
 			_hash_int(world_cell.x, world_cell.y, level, world_seed, 237) & 1) == 0 else -2
 		middle.x = clampf(middle.x + bow, square_left + 3, square_left + TILE_SIZE - 3)
-	var elevation_shift := Vector2(0, -level * HEIGHT_STEP)
+	var elevation_shift := Vector2(0, -level * height_step)
 	return PackedVector2Array([
 		(first + elevation_shift).round(),
 		(middle + elevation_shift).round(),
@@ -478,17 +488,28 @@ static func _unified_world_field(
 
 static func _append_unified_contour_band(
 		buffer: Dictionary, path: PackedVector2Array, source_id: int,
-		world_cell: Vector2i, level: int, profile_metrics: Dictionary) -> void:
+		world_cell: Vector2i, level: int, height_step: int,
+		profile_metrics: Dictionary, directional: bool = false) -> void:
 	_append_unified_offset_strip(
-		buffer, path, -2, HEIGHT_STEP + 1, 5, 0.96, source_id, 0, 1.0,
-		_hash_int(world_cell.x, world_cell.y, level, 0, 239), profile_metrics)
+		buffer, path, -2, height_step + 1, 5, 0.96, source_id, 0, 1.0,
+		_hash_int(world_cell.x, world_cell.y, level, 0, 239), profile_metrics,
+		directional)
+
+
+static func _directional_face_shade(delta: Vector2) -> float:
+	## High terrain is on the left. Camera elevation projects toward screen -Y;
+	## the low-side normal's +Y component measures front-facing exposure.
+	## Coverage is never reduced: upper surfaces perform actual depth occlusion.
+	var low_normal := Vector2(delta.y, -delta.x).normalized()
+	return 0.84 + 0.12 * maxf(0.0, low_normal.y) + 0.02 * low_normal.x
 
 
 static func _append_unified_contour_shadow(
 		buffer: Dictionary, path: PackedVector2Array, source_id: int,
-		world_cell: Vector2i, level: int, profile_metrics: Dictionary) -> void:
+		world_cell: Vector2i, level: int, height_step: int,
+		profile_metrics: Dictionary) -> void:
 	_append_unified_offset_strip(
-		buffer, path, HEIGHT_STEP - 3, HEIGHT_STEP + 1, 4, 0.82,
+		buffer, path, height_step - 3, height_step + 1, 4, 0.82,
 		source_id, 3, 0.34,
 		_hash_int(world_cell.x, world_cell.y, level, 0, 251), profile_metrics)
 
@@ -497,7 +518,8 @@ static func _append_unified_offset_strip(
 		buffer: Dictionary, path: PackedVector2Array,
 		upper_y: int, lower_y: int, lateral_depth: int,
 		shade: float, source_id: int, component_role: int, alpha: float,
-		diagonal_seed: int, profile_metrics: Dictionary) -> void:
+		diagonal_seed: int, profile_metrics: Dictionary,
+		directional: bool = false) -> void:
 	## Emit each segment independently. Pure vertical projection gives every
 	## shared crest endpoint the same foot endpoint; the bounded midpoint bow
 	## above prevents a vertical segment from collapsing to zero area.
@@ -513,7 +535,8 @@ static func _append_unified_offset_strip(
 			buffer, first + Vector2(0, upper_y), last + Vector2(0, upper_y),
 			last + Vector2(0, upper_y) + extrusion,
 			first + Vector2(0, upper_y) + extrusion,
-			shade, source_id, (diagonal_seed + segment) & 1,
+			_directional_face_shade(delta) if directional else shade,
+			source_id, (diagonal_seed + segment) & 1,
 			component_role, alpha, profile_metrics)
 
 
@@ -597,13 +620,10 @@ static func _append_face(
 		right_minimum: int, right_maximum: int,
 		connected_contours_enabled: bool,
 		left_run_connected: bool, right_run_connected: bool,
-		profile_metrics: Dictionary) -> Vector2i:
+		height_step: int, profile_metrics: Dictionary) -> Vector2i:
 	var local_left: int = local_x * TILE_SIZE
-	var local_top_base: int = local_y * TILE_SIZE + TILE_SIZE - owner_height * HEIGHT_STEP
-	var local_bottom_base: int = local_y * TILE_SIZE + TILE_SIZE - south_height * HEIGHT_STEP
 	var world_left: int = world_pos.x * TILE_SIZE
-	var face_height: int = local_bottom_base - local_top_base
-	var row_count: int = maxi(1, ceili(float(face_height) / PROFILE_STEP))
+	var row_count: int = maxi(1, owner_height - south_height)
 	var connected_run: bool = (
 		connected_contours_enabled and (left_run_connected or right_run_connected))
 	var column_count: int = CONNECTED_COLUMN_COUNT if connected_run else COLUMN_COUNT
@@ -662,8 +682,8 @@ static func _append_face(
 					x10 += _face_cap_offset(world_pos, t0, world_seed, false)
 				if not right_row_connected and not right_below_connected:
 					x11 += _face_cap_offset(world_pos, t1, world_seed, false)
-			var row_top: int = local_y * TILE_SIZE + TILE_SIZE - band_maximum * HEIGHT_STEP
-			var row_bottom: int = row_top + HEIGHT_STEP
+			var row_top: int = local_y * TILE_SIZE + TILE_SIZE - band_maximum * height_step
+			var row_bottom: int = row_top + height_step
 			var y00: float = row_top + boundary_samples[row][column]
 			var y10: float = row_top + boundary_samples[row][column + 1]
 			var y01: float = row_bottom + boundary_samples[row + 1][column]
@@ -713,7 +733,7 @@ static func _append_edge_components(
 		east_id: int, refined_silhouettes_enabled: bool,
 		left_connected: bool, right_connected: bool,
 		connected_contours_enabled: bool,
-		profile_metrics: Dictionary) -> Vector2i:
+		height_step: int, profile_metrics: Dictionary) -> Vector2i:
 	var component_count: int = 0
 	var triangles_before: int = buffer.indices.size() / 3
 	if north_height < owner_height:
@@ -721,7 +741,7 @@ static func _append_edge_components(
 			terrain_id, bool(liquid_by_id.get(north_id, false)))
 		_append_north_lip(
 			buffer, local_x, local_y, world_pos, owner_height,
-			north_source, world_seed, profile_metrics)
+			north_source, world_seed, height_step, profile_metrics)
 		component_count += 1
 	if west_height < owner_height:
 		var west_source: int = _cliff_source_for(
@@ -730,11 +750,11 @@ static func _append_edge_components(
 			_append_refined_side_return(
 				buffer, local_x, local_y, world_pos, owner_height,
 				west_height, south_height, west_source, world_seed, true,
-				left_connected, connected_contours_enabled, profile_metrics)
+				left_connected, connected_contours_enabled, height_step, profile_metrics)
 		else:
 			_append_side_return(
 				buffer, local_x, local_y, world_pos, owner_height,
-				west_height, west_source, world_seed, true, profile_metrics)
+				west_height, west_source, world_seed, true, height_step, profile_metrics)
 		component_count += 1
 	if east_height < owner_height:
 		var east_source: int = _cliff_source_for(
@@ -743,11 +763,11 @@ static func _append_edge_components(
 			_append_refined_side_return(
 				buffer, local_x, local_y, world_pos, owner_height,
 				east_height, south_height, east_source, world_seed, false,
-				right_connected, connected_contours_enabled, profile_metrics)
+				right_connected, connected_contours_enabled, height_step, profile_metrics)
 		else:
 			_append_side_return(
 				buffer, local_x, local_y, world_pos, owner_height,
-				east_height, east_source, world_seed, false, profile_metrics)
+				east_height, east_source, world_seed, false, height_step, profile_metrics)
 		component_count += 1
 	return Vector2i(component_count, buffer.indices.size() / 3 - triangles_before)
 
@@ -755,9 +775,9 @@ static func _append_edge_components(
 static func _append_north_lip(
 		buffer: Dictionary, local_x: int, local_y: int, world_pos: Vector2i,
 		owner_height: int, source_id: int, world_seed: int,
-		profile_metrics: Dictionary) -> void:
+		height_step: int, profile_metrics: Dictionary) -> void:
 	var local_left: int = local_x * TILE_SIZE
-	var local_top: int = local_y * TILE_SIZE - owner_height * HEIGHT_STEP
+	var local_top: int = local_y * TILE_SIZE - owner_height * height_step
 	var world_left: int = world_pos.x * TILE_SIZE
 	for column in range(COLUMN_COUNT):
 		var world_x0: int = world_left + column * PROFILE_STEP
@@ -784,10 +804,10 @@ static func _append_side_return(
 		buffer: Dictionary, local_x: int, local_y: int, world_pos: Vector2i,
 		owner_height: int, neighbor_height: int, source_id: int,
 		world_seed: int, west_side: bool,
-		profile_metrics: Dictionary) -> void:
+		height_step: int, profile_metrics: Dictionary) -> void:
 	var boundary_x: int = local_x * TILE_SIZE + (0 if west_side else TILE_SIZE)
 	var world_boundary_x: int = world_pos.x * TILE_SIZE + (0 if west_side else TILE_SIZE)
-	var local_top: int = local_y * TILE_SIZE - owner_height * HEIGHT_STEP
+	var local_top: int = local_y * TILE_SIZE - owner_height * height_step
 	var drop: int = clampi(owner_height - neighbor_height, 1, 3)
 	var segment_count: int = TILE_SIZE / RETURN_PROFILE_STEP
 	for segment in range(segment_count):
@@ -819,13 +839,13 @@ static func _append_refined_side_return(
 		owner_height: int, neighbor_height: int, south_height: int,
 		source_id: int, world_seed: int, west_side: bool,
 		neighbor_face_connected: bool, connected_contours_enabled: bool,
-		profile_metrics: Dictionary) -> void:
+		height_step: int, profile_metrics: Dictionary) -> void:
 	## Phase 1E uses a coherent world-space ribbon rather than independent
 	## eight-pixel rectangles. Its last sample is snapped to the owning south
 	## face cap and grows a tapered shoulder into that wall when one exists.
 	var boundary_x: int = local_x * TILE_SIZE + (0 if west_side else TILE_SIZE)
 	var world_boundary_x: int = world_pos.x * TILE_SIZE + (0 if west_side else TILE_SIZE)
-	var local_top: int = local_y * TILE_SIZE - owner_height * HEIGHT_STEP
+	var local_top: int = local_y * TILE_SIZE - owner_height * height_step
 	var world_top: int = world_pos.y * TILE_SIZE
 	var drop: int = clampi(owner_height - neighbor_height, 1, 3)
 	var has_south_wall: bool = owner_height > south_height
@@ -840,7 +860,7 @@ static func _append_refined_side_return(
 		var width: int = _return_width(
 			world_boundary_x, world_y, owner_height, drop, world_seed)
 		if has_south_wall and sample == TILE_SIZE / REFINED_RETURN_STEP:
-			var face_height: int = (owner_height - south_height) * HEIGHT_STEP
+			var face_height: int = (owner_height - south_height) * height_step
 			outer_x = _face_top_cap_x(
 				boundary_x, world_pos, face_height, world_seed,
 				west_side, neighbor_face_connected)
@@ -947,9 +967,9 @@ static func _append_contact_shadow(
 		left_connected: bool, right_connected: bool,
 		connected_contours_enabled: bool,
 		left_run_connected: bool, right_run_connected: bool,
-		profile_metrics: Dictionary) -> int:
+		height_step: int, profile_metrics: Dictionary) -> int:
 	var local_left: int = local_x * TILE_SIZE
-	var local_bottom_base: int = local_y * TILE_SIZE + TILE_SIZE - south_height * HEIGHT_STEP
+	var local_bottom_base: int = local_y * TILE_SIZE + TILE_SIZE - south_height * height_step
 	var world_left: int = world_pos.x * TILE_SIZE
 	var triangles_before: int = buffer.indices.size() / 3
 	var connected_run: bool = (

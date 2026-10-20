@@ -29,6 +29,18 @@ uniform float liquid_motion_speed = 0.18;
 uniform float shoreline_width : hint_range(0.02, 0.3) = 0.16;
 uniform float liquid_depth_effect_strength : hint_range(0.0, 0.35) = 0.1;
 uniform float liquid_emissive_strength : hint_range(0.0, 1.0) = 0.0;
+// Phase A is an optional extension of the existing liquid branch. Keeping one
+// branch and one shared material preserves liquid identity and avoids per-cell
+// presentation state.
+uniform float experimental_water_enhancement_enabled : hint_range(0.0, 1.0) = 0.0;
+uniform float water_ripple_strength : hint_range(0.0, 1.0) = 0.32;
+uniform float water_secondary_ripple_scale : hint_range(0.5, 6.0) = 2.4;
+uniform float water_ripple_drift_speed : hint_range(0.0, 2.0) = 0.55;
+uniform float water_glint_density : hint_range(0.0, 1.0) = 0.14;
+uniform float water_glint_brightness : hint_range(0.0, 1.0) = 0.38;
+// Negative uses Godot's global TIME. Tests may provide a fixed non-negative
+// time so before/after captures compare the same animation instant.
+uniform float water_animation_time_override = -1.0;
 
 varying vec2 world_position;
 
@@ -88,7 +100,9 @@ void fragment() {
         // Broad world-space bands break tile repetition without per-cell nodes.
         // Motion is a single optional phase term and is quantised to retain the
         // nearest-neighbour pixel-art character at high zoom.
-        float motion_phase = TIME * liquid_motion_speed * liquid_motion_enabled;
+        float water_time = water_animation_time_override >= 0.0
+            ? water_animation_time_override : TIME;
+        float motion_phase = water_time * liquid_motion_speed * liquid_motion_enabled;
         vec2 liquid_pixel = floor(world_position) + vec2(0.5);
         float band = sin(
             dot(liquid_pixel, vec2(liquid_pattern_frequency, liquid_pattern_frequency * 0.43))
@@ -107,6 +121,53 @@ void fragment() {
         surface_rgb = mix(surface_rgb, liquid_highlight_tint, shoreline * 0.34);
         surface_rgb *= 1.0 - liquid_depth_effect_strength * (1.0 - macro) * 0.28;
         surface_rgb += liquid_highlight_tint * liquid_emissive_strength * 0.18;
+
+        if (experimental_water_enhancement_enabled > 0.5) {
+            // A second, differently directed field is stepped at eight beats
+            // per second. World-pixel coordinates and whole-pixel drift keep
+            // the result crisp under camera motion and continuous at seams.
+            float water_beat = floor(water_time * 8.0) / 8.0;
+            vec2 secondary_drift = floor(vec2(13.0, -7.0)
+                * water_beat * water_ripple_drift_speed);
+            vec2 secondary_coordinate = (liquid_pixel + secondary_drift)
+                * liquid_pattern_frequency * water_secondary_ripple_scale;
+            float secondary_ripple = sin(dot(
+                secondary_coordinate, vec2(0.61, 1.27)) + 1.73);
+            float secondary_crest = secondary_ripple * 0.5 + 0.5;
+            float secondary_shimmer = (secondary_crest - 0.5)
+                * liquid_shimmer_strength * water_ripple_strength;
+            surface_rgb += liquid_highlight_tint * secondary_shimmer;
+
+            // Candidate dashes are fixed to a world-space lattice. Each one
+            // receives a deterministic short beat and appears only on a crest.
+            vec2 glint_pixel = floor(liquid_pixel);
+            vec2 glint_cell = floor(glint_pixel / vec2(12.0, 7.0));
+            vec2 glint_local = glint_pixel - glint_cell * vec2(12.0, 7.0);
+            float placement = hash_value(glint_cell + seed_offset * 0.013);
+            if (placement < water_glint_density && secondary_crest > 0.67) {
+                float shape_hash = hash_value(glint_cell + vec2(41.0, -19.0));
+                float glint_row = 1.0 + floor(shape_hash * 4.0);
+                float glint_start = 1.0 + floor(hash_value(
+                    glint_cell + vec2(-7.0, 29.0)) * 5.0);
+                float glint_length = 2.0 + floor(hash_value(
+                    glint_cell + vec2(17.0, 53.0)) * 3.0);
+                float glint_slope = shape_hash > 0.72 ? 1.0 : 0.0;
+                float beat_offset = floor(hash_value(
+                    glint_cell + vec2(73.0, 11.0)) * 12.0);
+                float glint_beat = mod(floor(water_time * 4.0) + beat_offset, 12.0);
+                bool horizontal = abs(glint_local.y - glint_row) < 0.25
+                    && glint_local.x >= glint_start
+                    && glint_local.x < glint_start + glint_length;
+                bool angled_tip = glint_slope > 0.5
+                    && abs(glint_local.y - glint_row - 1.0) < 0.25
+                    && abs(glint_local.x - glint_start - glint_length) < 0.25;
+                if (glint_beat < 1.0 && (horizontal || angled_tip)) {
+                    surface_rgb = mix(
+                        surface_rgb, liquid_highlight_tint,
+                        water_glint_brightness);
+                }
+            }
+        }
     }
     COLOR = vec4(clamp(surface_rgb, vec3(0.0), vec3(1.0)), mask_alpha);
 }
