@@ -140,58 +140,7 @@ var _world_dirty: bool = false
 
 func _ready() -> void:
 	terrain = TerrainRenderer.new()
-	terrain.world_seed = world_seed
-	terrain.biome_frequency = biome_frequency
-	terrain.detail_frequency = detail_frequency
-	terrain.include_origin_demo = include_origin_demo
-	terrain.procedural_elevation_enabled = procedural_elevation_enabled
-	terrain.max_generated_elevation = max_generated_elevation
-	terrain.elevation_frequency = elevation_frequency
-	terrain.elevation_detail_frequency = elevation_detail_frequency
-	terrain.elevation_detail_strength = elevation_detail_strength
-	terrain.elevation_threshold_1 = elevation_threshold_1
-	terrain.elevation_threshold_2 = elevation_threshold_2
-	terrain.elevation_threshold_3 = elevation_threshold_3
-	terrain.elevation_flatness_bias = elevation_flatness_bias
-	terrain.sea_level = sea_level
-	terrain.load_margin_chunks = load_margin_chunks
-	terrain.unload_margin_chunks = unload_margin_chunks
-	terrain.chunks_created_per_frame = chunks_created_per_frame
-	terrain.profiling_enabled = chunk_profiling_enabled
-	terrain.max_chunk_processing_ms = max_chunk_processing_ms
-	terrain.chunk_work_quantum_cells = chunk_work_quantum_cells
-	terrain.max_tile_cells_per_frame = max_tile_cells_per_frame
-	terrain.texture_variation_enabled = texture_variation_enabled
-	terrain.texture_variation_strength = texture_variation_strength
-	terrain.texture_variation_frequency = texture_variation_frequency
-	terrain.organic_boundaries_enabled = organic_boundaries_enabled
-	terrain.organic_edge_strength = organic_edge_strength
-	terrain.organic_edge_frequency = organic_edge_frequency
-	terrain.experimental_water_enhancement_enabled = experimental_water_enhancement_enabled
-	terrain.water_ripple_strength = clampf(water_ripple_strength, 0.0, 1.0)
-	terrain.water_secondary_ripple_scale = clampf(water_secondary_ripple_scale, 0.5, 6.0)
-	terrain.water_ripple_drift_speed = clampf(water_ripple_drift_speed, 0.0, 2.0)
-	terrain.water_glint_density = clampf(water_glint_density, 0.0, 1.0)
-	terrain.water_glint_brightness = clampf(water_glint_brightness, 0.0, 1.0)
-	terrain.procedural_cliff_materials_enabled = procedural_cliff_materials_enabled
-	terrain.organic_cliff_geometry_enabled = organic_cliff_geometry_enabled
-	terrain.unified_cliff_components_enabled = unified_cliff_components_enabled
-	terrain.refined_cliff_silhouettes_enabled = refined_cliff_silhouettes_enabled
-	terrain.connected_cliff_contours_enabled = connected_cliff_contours_enabled
-	terrain.unified_cliff_contours_enabled = unified_cliff_contours_enabled
-	terrain.directional_cliff_projection_enabled = directional_cliff_projection_enabled
-	terrain.cliff_height_profile = cliff_height_profile
-	terrain.cliff_edge_overlays_visible = cliff_edge_overlays_visible
-	terrain.cliff_shadows_visible = cliff_shadows_visible
-	terrain.decorations_enabled = decorations_enabled
-	terrain.decoration_density = decoration_density
-	terrain.decoration_clustering_strength = decoration_clustering_strength
-	terrain.decoration_seed_offset = decoration_seed_offset
-	terrain.environment_objects_enabled = environment_objects_enabled
-	terrain.procedural_vegetation_enabled = procedural_vegetation_enabled
-	terrain.environment_object_density = environment_object_density
-	terrain.environment_object_seed_offset = environment_object_seed_offset
-	terrain.berry_regrowth_seconds = berry_regrowth_seconds
+	_configure_terrain_renderer(terrain)
 	add_child(terrain)
 	terrain.authoritative_state_changed.connect(_mark_world_dirty)
 	if include_elevation_demo:
@@ -225,6 +174,63 @@ func _ready() -> void:
 	_update_selected_label()
 	_reset_camera()
 	_update_visible_world_region()
+
+
+func _configure_terrain_renderer(renderer: TerrainRenderer) -> void:
+	## Complete configuration before add_child() initializes renderer-owned
+	## materials, procedural contexts, terrain authority, and resource state.
+	renderer.world_seed = world_seed
+	renderer.biome_frequency = biome_frequency
+	renderer.detail_frequency = detail_frequency
+	renderer.include_origin_demo = include_origin_demo
+	renderer.procedural_elevation_enabled = procedural_elevation_enabled
+	renderer.max_generated_elevation = max_generated_elevation
+	renderer.elevation_frequency = elevation_frequency
+	renderer.elevation_detail_frequency = elevation_detail_frequency
+	renderer.elevation_detail_strength = elevation_detail_strength
+	renderer.elevation_threshold_1 = elevation_threshold_1
+	renderer.elevation_threshold_2 = elevation_threshold_2
+	renderer.elevation_threshold_3 = elevation_threshold_3
+	renderer.elevation_flatness_bias = elevation_flatness_bias
+	renderer.sea_level = sea_level
+	renderer.load_margin_chunks = load_margin_chunks
+	renderer.unload_margin_chunks = unload_margin_chunks
+	renderer.chunks_created_per_frame = chunks_created_per_frame
+	renderer.profiling_enabled = chunk_profiling_enabled
+	renderer.max_chunk_processing_ms = max_chunk_processing_ms
+	renderer.chunk_work_quantum_cells = chunk_work_quantum_cells
+	renderer.max_tile_cells_per_frame = max_tile_cells_per_frame
+	renderer.texture_variation_enabled = texture_variation_enabled
+	renderer.texture_variation_strength = texture_variation_strength
+	renderer.texture_variation_frequency = texture_variation_frequency
+	renderer.organic_boundaries_enabled = organic_boundaries_enabled
+	renderer.organic_edge_strength = organic_edge_strength
+	renderer.organic_edge_frequency = organic_edge_frequency
+	renderer.experimental_water_enhancement_enabled = experimental_water_enhancement_enabled
+	renderer.water_ripple_strength = clampf(water_ripple_strength, 0.0, 1.0)
+	renderer.water_secondary_ripple_scale = clampf(water_secondary_ripple_scale, 0.5, 6.0)
+	renderer.water_ripple_drift_speed = clampf(water_ripple_drift_speed, 0.0, 2.0)
+	renderer.water_glint_density = clampf(water_glint_density, 0.0, 1.0)
+	renderer.water_glint_brightness = clampf(water_glint_brightness, 0.0, 1.0)
+	renderer.procedural_cliff_materials_enabled = procedural_cliff_materials_enabled
+	renderer.organic_cliff_geometry_enabled = organic_cliff_geometry_enabled
+	renderer.unified_cliff_components_enabled = unified_cliff_components_enabled
+	renderer.refined_cliff_silhouettes_enabled = refined_cliff_silhouettes_enabled
+	renderer.connected_cliff_contours_enabled = connected_cliff_contours_enabled
+	renderer.unified_cliff_contours_enabled = unified_cliff_contours_enabled
+	renderer.directional_cliff_projection_enabled = directional_cliff_projection_enabled
+	renderer.cliff_height_profile = cliff_height_profile
+	renderer.cliff_edge_overlays_visible = cliff_edge_overlays_visible
+	renderer.cliff_shadows_visible = cliff_shadows_visible
+	renderer.decorations_enabled = decorations_enabled
+	renderer.decoration_density = decoration_density
+	renderer.decoration_clustering_strength = decoration_clustering_strength
+	renderer.decoration_seed_offset = decoration_seed_offset
+	renderer.environment_objects_enabled = environment_objects_enabled
+	renderer.procedural_vegetation_enabled = procedural_vegetation_enabled
+	renderer.environment_object_density = environment_object_density
+	renderer.environment_object_seed_offset = environment_object_seed_offset
+	renderer.berry_regrowth_seconds = berry_regrowth_seconds
 
 
 func _process(delta: float) -> void:
@@ -628,39 +634,11 @@ func _replace_world_from_snapshot(snapshot: Dictionary) -> Dictionary:
 	var generation: Dictionary = saved_world["generation"]
 	var old_terrain = terrain
 	var replacement = TerrainRenderer.new()
+	_configure_terrain_renderer(replacement)
+	# Saved authority overrides matching scene exports before _ready() builds its
+	# generator, placement contexts, and resource-state manager.
 	replacement.apply_generation_config(generation)
 	replacement.berry_regrowth_seconds = float(snapshot["resources"]["berry_regrowth_seconds"])
-	replacement.load_margin_chunks = old_terrain.load_margin_chunks
-	replacement.unload_margin_chunks = old_terrain.unload_margin_chunks
-	replacement.chunks_created_per_frame = old_terrain.chunks_created_per_frame
-	replacement.max_chunk_processing_ms = old_terrain.max_chunk_processing_ms
-	replacement.chunk_work_quantum_cells = old_terrain.chunk_work_quantum_cells
-	replacement.max_tile_cells_per_frame = old_terrain.max_tile_cells_per_frame
-	replacement.texture_variation_enabled = texture_variation_enabled
-	replacement.texture_variation_strength = texture_variation_strength
-	replacement.texture_variation_frequency = texture_variation_frequency
-	replacement.organic_boundaries_enabled = organic_boundaries_enabled
-	replacement.organic_edge_strength = organic_edge_strength
-	replacement.organic_edge_frequency = organic_edge_frequency
-	replacement.experimental_water_enhancement_enabled = experimental_water_enhancement_enabled
-	replacement.water_ripple_strength = water_ripple_strength
-	replacement.water_secondary_ripple_scale = water_secondary_ripple_scale
-	replacement.water_ripple_drift_speed = water_ripple_drift_speed
-	replacement.water_glint_density = water_glint_density
-	replacement.water_glint_brightness = water_glint_brightness
-	replacement.procedural_cliff_materials_enabled = procedural_cliff_materials_enabled
-	replacement.organic_cliff_geometry_enabled = organic_cliff_geometry_enabled
-	replacement.unified_cliff_components_enabled = unified_cliff_components_enabled
-	replacement.refined_cliff_silhouettes_enabled = refined_cliff_silhouettes_enabled
-	replacement.connected_cliff_contours_enabled = connected_cliff_contours_enabled
-	replacement.unified_cliff_contours_enabled = unified_cliff_contours_enabled
-	replacement.directional_cliff_projection_enabled = terrain.directional_cliff_projection_enabled
-	replacement.cliff_height_profile = cliff_height_profile
-	replacement.cliff_edge_overlays_visible = cliff_edge_overlays_visible
-	replacement.cliff_shadows_visible = cliff_shadows_visible
-	replacement.decorations_enabled = decorations_enabled
-	replacement.environment_objects_enabled = environment_objects_enabled
-	replacement.procedural_vegetation_enabled = procedural_vegetation_enabled
 	add_child(replacement)
 	var import_result: Dictionary = replacement.import_authoritative_snapshot({
 		"terrain": snapshot["terrain"], "resources": snapshot["resources"],
