@@ -14,10 +14,10 @@ const DecorationCatalog = preload("res://scripts/decoration_catalog.gd")
 const EnvironmentObjectCatalog = preload("res://scripts/environment_object_catalog.gd")
 const EnvironmentObjectPlacement = preload("res://scripts/environment_object_placement.gd")
 const EnvironmentObjectRenderer = preload("res://scripts/environment_object_renderer.gd")
-const EnvironmentObjectSpriteFactory = preload("res://scripts/procgen/environment_object_sprite_factory.gd")
 const ResourceStateManager = preload("res://scripts/resource_state_manager.gd")
-const VariationShader = preload("res://shaders/terrain_variation.gdshader")
-const CliffProceduralShader = preload("res://shaders/cliff_procedural.gdshader")
+const TerrainSurfaceFactory = preload("res://scripts/terrain_surface_factory.gd")
+const CliffResourceFactory = preload("res://scripts/cliff_resource_factory.gd")
+const TerrainDetailAtlasFactory = preload("res://scripts/terrain_detail_atlas_factory.gd")
 
 const TILE_SIZE: Vector2i = Vector2i(32, 32)
 const CHUNK_SIZE: int = 32
@@ -1066,15 +1066,8 @@ func set_water_animation_time_override(seconds: float) -> void:
 
 
 func _apply_water_enhancement_parameters(material: ShaderMaterial) -> void:
-	material.set_shader_parameter(
-		"experimental_water_enhancement_enabled",
-		1.0 if experimental_water_enhancement_enabled else 0.0)
-	material.set_shader_parameter("water_ripple_strength", water_ripple_strength)
-	material.set_shader_parameter(
-		"water_secondary_ripple_scale", water_secondary_ripple_scale)
-	material.set_shader_parameter("water_ripple_drift_speed", water_ripple_drift_speed)
-	material.set_shader_parameter("water_glint_density", water_glint_density)
-	material.set_shader_parameter("water_glint_brightness", water_glint_brightness)
+	TerrainSurfaceFactory.apply_water_enhancement_parameters(
+		material, _terrain_surface_factory_config()["water"])
 
 
 func set_procedural_cliff_materials_enabled(enabled: bool) -> void:
@@ -1735,224 +1728,73 @@ func _set_resource_aware_chunk_objects(
 		resource_ids, resource_flags)
 
 
-func _build_shared_tileset() -> void:
-	render_tileset = TileSet.new()
-	render_tileset.tile_size = TILE_SIZE
+func _terrain_surface_factory_config() -> Dictionary:
+	return {
+		"world_seed": world_seed,
+		"texture_variation_enabled": texture_variation_enabled,
+		"texture_variation_strength": texture_variation_strength,
+		"texture_variation_frequency": texture_variation_frequency,
+		"organic_boundaries_enabled": organic_boundaries_enabled,
+		"organic_edge_strength": organic_edge_strength,
+		"organic_edge_frequency": organic_edge_frequency,
+		"water": {
+			"enabled": experimental_water_enhancement_enabled,
+			"ripple_strength": water_ripple_strength,
+			"secondary_scale": water_secondary_ripple_scale,
+			"drift_speed": water_ripple_drift_speed,
+			"glint_density": water_glint_density,
+			"glint_brightness": water_glint_brightness,
+		},
+	}
 
-	for material in Catalog.MATERIALS:
-		var terrain_id: int = material["id"]
-		assert(not priority_by_id.has(terrain_id), "Duplicate terrain ID")
-		priority_by_id[terrain_id] = int(material["priority"])
-		name_by_id[terrain_id] = String(material["name"])
-		liquid_by_id[terrain_id] = bool(material.get("liquid", false))
-		var texture: Texture2D = load(material["texture_path"]) as Texture2D
-		assert(texture != null, "Missing material PNG: " + str(material["texture_path"]))
-		var visual_material: ShaderMaterial = _create_visual_material(material)
-		visual_material_by_id[terrain_id] = visual_material
-		var source := TileSetAtlasSource.new()
-		source.texture_region_size = TILE_SIZE
-		source.texture = _generate_masked_atlas(texture)
-		source.use_texture_padding = true
-		for mask in range(16):
-			var atlas_position: Vector2i = _atlas_pos(mask)
-			source.create_tile(atlas_position)
-			source.get_tile_data(atlas_position, 0).material = visual_material
-		var assigned_id: int = render_tileset.add_source(source, terrain_id)
-		assert(assigned_id == terrain_id, "Could not add terrain atlas")
+
+func _build_shared_tileset() -> void:
+	var resources: Dictionary = TerrainSurfaceFactory.create(
+		Catalog.MATERIALS, TILE_SIZE, _terrain_surface_factory_config())
+	render_tileset = resources["tileset"]
+	priority_by_id = resources["priority_by_id"]
+	name_by_id = resources["name_by_id"]
+	liquid_by_id = resources["liquid_by_id"]
+	visual_material_by_id = resources["visual_material_by_id"]
+	variant_count_by_id = resources["variant_count_by_id"]
 
 
 func _build_shared_cliff_tileset() -> void:
-	cliff_tileset = TileSet.new()
-	cliff_tileset.tile_size = Vector2i(TILE_SIZE.x, HEIGHT_STEP)
-	cliff_material_by_source.clear()
-	cliff_shadow_material_by_source.clear()
-	var cliff_definitions := [
-		{"id": 0, "texture_path": "res://art/dirt.png", "stone": false, "shoreline": false},
-		{"id": 1, "texture_path": "res://art/stone.png", "stone": true, "shoreline": false},
-		{"id": 2, "texture_path": "res://art/dirt.png", "stone": false, "shoreline": true},
-		{"id": 3, "texture_path": "res://art/stone.png", "stone": true, "shoreline": true},
-	]
-	for definition in cliff_definitions:
-		var texture: Texture2D = load(definition.texture_path) as Texture2D
-		assert(texture != null, "Missing cliff source texture")
-		var material := _create_cliff_material(
-			texture, bool(definition.stone), bool(definition.shoreline), int(definition.id))
-		var shadow_material := _create_cliff_material(
-			texture, bool(definition.stone), bool(definition.shoreline),
-			int(definition.id), true)
-		cliff_material_by_source[int(definition.id)] = material
-		cliff_shadow_material_by_source[int(definition.id)] = shadow_material
-		var source := TileSetAtlasSource.new()
-		source.texture_region_size = Vector2i(TILE_SIZE.x, HEIGHT_STEP)
-		source.texture = _generate_cliff_atlas(
-			texture, bool(definition.stone), bool(definition.shoreline))
-		source.use_texture_padding = true
-		for variant in range(32):
-			source.create_tile(Vector2i(variant, 0))
-			source.get_tile_data(Vector2i(variant, 0), 0).material = material
-			source.create_tile(Vector2i(variant, 1))
-			source.get_tile_data(Vector2i(variant, 1), 0).material = shadow_material
-		var assigned_id: int = cliff_tileset.add_source(source, int(definition.id))
-		assert(assigned_id == int(definition.id), "Could not add cliff atlas")
-	organic_cliff_material = _create_organic_cliff_material()
-
-
-func _create_organic_cliff_material() -> ShaderMaterial:
-	var material := ShaderMaterial.new()
-	material.shader = CliffProceduralShader
-	material.set_shader_parameter("source_texture", load("res://art/dirt.png"))
-	material.set_shader_parameter("dirt_texture", load("res://art/dirt.png"))
-	material.set_shader_parameter("stone_texture", load("res://art/stone.png"))
-	material.set_shader_parameter("procedural_enabled", procedural_cliff_materials_enabled)
-	material.set_shader_parameter("combined_geometry", true)
-	material.set_shader_parameter("seed_offset", Vector2(
-		float(posmod(world_seed * 7 + 1871, 8192)),
-		float(posmod(world_seed * 11 + 3917, 8192))))
-	return material
-
-
-func _create_cliff_material(
-		source_texture: Texture2D, stone_style: bool,
-		shoreline: bool, source_id: int, contact_shadow: bool = false,
-		geometry_mesh: bool = false) -> ShaderMaterial:
-	var material := ShaderMaterial.new()
-	material.shader = CliffProceduralShader
-	material.set_shader_parameter("source_texture", source_texture)
-	material.set_shader_parameter("procedural_enabled", procedural_cliff_materials_enabled)
-	material.set_shader_parameter("stone_style", stone_style)
-	material.set_shader_parameter("shoreline", shoreline)
-	material.set_shader_parameter("contact_shadow", contact_shadow)
-	material.set_shader_parameter("geometry_mesh", geometry_mesh)
-	material.set_shader_parameter("seed_offset", Vector2(
-		float(posmod(world_seed * 7 + source_id * 1871, 8192)),
-		float(posmod(world_seed * 11 + source_id * 3917, 8192))))
-	return material
+	var resources: Dictionary = CliffResourceFactory.create(
+		TILE_SIZE, HEIGHT_STEP, world_seed, procedural_cliff_materials_enabled)
+	cliff_tileset = resources["cliff_tileset"]
+	cliff_edge_tileset = resources["edge_tileset"]
+	cliff_material_by_source = resources["materials"]
+	cliff_shadow_material_by_source = resources["shadow_materials"]
+	organic_cliff_material = resources["organic_material"]
 
 
 func _build_shared_cliff_edge_tileset() -> void:
-	cliff_edge_tileset = TileSet.new()
-	cliff_edge_tileset.tile_size = TILE_SIZE
-	var edge_definitions := [
-		{"id": 0, "texture_path": "res://art/dirt.png", "stone": false, "shoreline": false},
-		{"id": 1, "texture_path": "res://art/stone.png", "stone": true, "shoreline": false},
-		{"id": 2, "texture_path": "res://art/dirt.png", "stone": false, "shoreline": true},
-		{"id": 3, "texture_path": "res://art/stone.png", "stone": true, "shoreline": true},
-	]
-	for definition in edge_definitions:
-		var texture: Texture2D = load(definition.texture_path) as Texture2D
-		assert(texture != null, "Missing cliff edge source texture")
-		var source := TileSetAtlasSource.new()
-		source.texture_region_size = TILE_SIZE
-		source.texture = _generate_cliff_edge_atlas(
-			texture, bool(definition.stone), bool(definition.shoreline))
-		source.use_texture_padding = true
-		for variant in range(9):
-			for edge_mask in range(1, 16):
-				var atlas_position := Vector2i(edge_mask, variant)
-				source.create_tile(atlas_position)
-				source.get_tile_data(atlas_position, 0).material = (
-					cliff_material_by_source[int(definition.id)])
-		var assigned_id: int = cliff_edge_tileset.add_source(source, int(definition.id))
-		assert(assigned_id == int(definition.id), "Could not add cliff edge atlas")
+	assert(cliff_edge_tileset != null)
 
 
 func _build_shared_decoration_tileset() -> void:
-	decoration_tileset = TileSet.new()
-	decoration_tileset.tile_size = TILE_SIZE
-	decoration_atlas_by_id.clear()
-	var total_variants: int = 0
-	for definition in DecorationCatalog.DEFINITIONS:
-		decoration_atlas_by_id[int(definition["id"])] = total_variants
-		total_variants += maxi(1, int(definition.get("variants", 1)))
-
-	var atlas_image := Image.create(
-		TILE_SIZE.x * total_variants, TILE_SIZE.y, false,
-		Image.FORMAT_RGBA8)
-	atlas_image.fill(Color.TRANSPARENT)
-	for definition in DecorationCatalog.DEFINITIONS:
-		var atlas_start: int = int(decoration_atlas_by_id[int(definition["id"])])
-		for variant in range(maxi(1, int(definition.get("variants", 1)))):
-			_draw_decoration_variant(
-				atlas_image, atlas_start + variant, definition, variant)
-
-	var source := TileSetAtlasSource.new()
-	source.texture_region_size = TILE_SIZE
-	source.texture = ImageTexture.create_from_image(atlas_image)
-	source.use_texture_padding = true
-	for atlas_x in range(total_variants):
-		source.create_tile(Vector2i(atlas_x, 0))
-	var assigned_id: int = decoration_tileset.add_source(source, 0)
-	assert(assigned_id == 0, "Could not add shared decoration atlas")
+	var resources: Dictionary = TerrainDetailAtlasFactory.create_decoration_tileset(
+		DecorationCatalog.DEFINITIONS, TILE_SIZE, _draw_decoration_variant)
+	decoration_tileset = resources["tileset"]
+	decoration_atlas_by_id = resources["atlas_by_id"]
 
 
 func _build_shared_environment_object_atlas() -> void:
-	const ATLAS_CELL_SIZE := Vector2i(96, 96)
-	var generation_start_usec: int = Time.get_ticks_usec()
-	environment_object_atlas_by_id.clear()
-	environment_object_unripe_atlas_by_id.clear()
-	var total_variants: int = 0
-	var procedural_variants: int = 0
-	var procedural_tree_variants: int = 0
-	for definition in EnvironmentObjectCatalog.DEFINITIONS:
-		environment_object_atlas_by_id[int(definition["id"])] = total_variants
-		var definition_variants: int = maxi(1, int(definition.get("variants", 1)))
-		total_variants += definition_variants
-		if EnvironmentObjectSpriteFactory.is_supported(definition):
-			procedural_variants += definition_variants
-			if String(definition.get("category", "")) == "trees":
-				procedural_tree_variants += definition_variants
-	for definition in EnvironmentObjectCatalog.DEFINITIONS:
-		if String(definition.get("resource_category", "")) != "food":
-			continue
-		environment_object_unripe_atlas_by_id[int(definition["id"])] = total_variants
-		var unripe_variants: int = maxi(1, int(definition.get("variants", 1)))
-		total_variants += unripe_variants
-		procedural_variants += unripe_variants
-	var atlas_image := Image.create(
-		ATLAS_CELL_SIZE.x * total_variants, ATLAS_CELL_SIZE.y,
-		false, Image.FORMAT_RGBA8)
-	atlas_image.fill(Color.TRANSPARENT)
-	for definition in EnvironmentObjectCatalog.DEFINITIONS:
-		var atlas_start: int = int(environment_object_atlas_by_id[int(definition["id"])])
-		for variant in range(maxi(1, int(definition.get("variants", 1)))):
-			if EnvironmentObjectSpriteFactory.is_supported(definition):
-				EnvironmentObjectSpriteFactory.draw_variant(
-					atlas_image, atlas_start + variant, definition, variant)
-			else:
-				_draw_environment_object_variant(
-					atlas_image, atlas_start + variant, definition, variant)
-	for definition in EnvironmentObjectCatalog.DEFINITIONS:
-		var object_id: int = int(definition["id"])
-		if not environment_object_unripe_atlas_by_id.has(object_id):
-			continue
-		var atlas_start: int = int(environment_object_unripe_atlas_by_id[object_id])
-		for variant in range(maxi(1, int(definition.get("variants", 1)))):
-			EnvironmentObjectSpriteFactory.draw_variant(
-				atlas_image, atlas_start + variant, definition, variant, false)
-	environment_object_procedural_atlas_texture = ImageTexture.create_from_image(atlas_image)
-	var legacy_generation_start_usec: int = Time.get_ticks_usec()
-	var legacy_tree_image: Image = atlas_image.duplicate()
-	for definition in EnvironmentObjectCatalog.DEFINITIONS:
-		if String(definition.get("category", "")) != "trees":
-			continue
-		var atlas_start: int = int(environment_object_atlas_by_id[int(definition["id"])])
-		for variant in range(maxi(1, int(definition.get("variants", 1)))):
-			legacy_tree_image.fill_rect(
-				Rect2i(Vector2i((atlas_start + variant) * ATLAS_CELL_SIZE.x, 0), ATLAS_CELL_SIZE),
-				Color.TRANSPARENT)
-			_draw_environment_object_variant(
-				legacy_tree_image, atlas_start + variant, definition, variant)
-	environment_object_legacy_tree_atlas_texture = ImageTexture.create_from_image(legacy_tree_image)
-	environment_legacy_atlas_generation_usec = Time.get_ticks_usec() - legacy_generation_start_usec
-	environment_object_atlas_texture = (
-		environment_object_procedural_atlas_texture
-		if procedural_vegetation_enabled else environment_object_legacy_tree_atlas_texture)
-	environment_atlas_variant_count = total_variants
-	environment_procedural_variant_count = procedural_variants
-	environment_procedural_tree_variant_count = procedural_tree_variants
-	environment_atlas_dimensions = atlas_image.get_size()
-	environment_atlas_generation_usec = Time.get_ticks_usec() - generation_start_usec
-
+	var resources: Dictionary = TerrainDetailAtlasFactory.create_environment_atlases(
+		EnvironmentObjectCatalog.DEFINITIONS, procedural_vegetation_enabled,
+		_draw_environment_object_variant)
+	environment_object_atlas_texture = resources["active_texture"]
+	environment_object_procedural_atlas_texture = resources["procedural_texture"]
+	environment_object_legacy_tree_atlas_texture = resources["legacy_tree_texture"]
+	environment_object_atlas_by_id = resources["atlas_by_id"]
+	environment_object_unripe_atlas_by_id = resources["unripe_atlas_by_id"]
+	environment_atlas_variant_count = resources["variant_count"]
+	environment_procedural_variant_count = resources["procedural_variant_count"]
+	environment_procedural_tree_variant_count = resources["procedural_tree_variant_count"]
+	environment_atlas_dimensions = resources["dimensions"]
+	environment_legacy_atlas_generation_usec = resources["legacy_generation_usec"]
+	environment_atlas_generation_usec = resources["generation_usec"]
 
 func _draw_environment_object_variant(
 		image: Image, atlas_x: int,
@@ -2164,361 +2006,3 @@ func _put_pixel(image: Image, point: Vector2i, color: Color) -> void:
 	if point.x < 0 or point.y < 0 or point.x >= image.get_width() or point.y >= image.get_height():
 		return
 	image.set_pixel(point.x, point.y, color)
-
-
-func _create_visual_material(material_definition: Dictionary) -> ShaderMaterial:
-	var fallback_path: String = String(material_definition["texture_path"])
-	var variant_definitions: Array = material_definition.get("variants", [])
-	if variant_definitions.is_empty():
-		variant_definitions = [{"texture_path": fallback_path}]
-
-	var variant_textures: Array[Texture2D] = []
-	for variant_definition in variant_definitions:
-		variant_textures.append(_generate_visual_variant(variant_definition, fallback_path))
-	variant_count_by_id[int(material_definition["id"])] = variant_textures.size()
-	while variant_textures.size() < 4:
-		variant_textures.append(variant_textures[variant_textures.size() - 1])
-
-	var shader_material := ShaderMaterial.new()
-	shader_material.shader = VariationShader
-	shader_material.set_shader_parameter("base_texture", variant_textures[0])
-	shader_material.set_shader_parameter("variant_texture_1", variant_textures[mini(1, variant_textures.size() - 1)])
-	shader_material.set_shader_parameter("variant_texture_2", variant_textures[mini(2, variant_textures.size() - 1)])
-	shader_material.set_shader_parameter("variant_texture_3", variant_textures[mini(3, variant_textures.size() - 1)])
-	shader_material.set_shader_parameter("variation_enabled", 1.0 if texture_variation_enabled else 0.0)
-	var material_strength: float = float(material_definition.get("variation_strength", 1.0))
-	var frequency_scale: float = float(material_definition.get("variation_frequency_scale", 1.0))
-	shader_material.set_shader_parameter("variation_strength", clampf(texture_variation_strength * material_strength, 0.0, 1.0))
-	shader_material.set_shader_parameter("variation_frequency", maxf(0.00001, texture_variation_frequency * frequency_scale))
-	var terrain_id: int = int(material_definition["id"])
-	shader_material.set_shader_parameter("seed_offset", Vector2(
-		float(posmod(world_seed + terrain_id * 1301, 8192)),
-		float(posmod(world_seed * 3 + terrain_id * 3253, 8192))
-	))
-	shader_material.set_shader_parameter("organic_boundaries_enabled", 1.0 if organic_boundaries_enabled else 0.0)
-	shader_material.set_shader_parameter("organic_edge_strength", clampf(organic_edge_strength, 0.0, 0.18))
-	shader_material.set_shader_parameter("organic_edge_frequency", maxf(0.00001, organic_edge_frequency))
-	# This offset intentionally excludes terrain_id: every material and layer
-	# must evaluate exactly the same boundary displacement at a world pixel.
-	shader_material.set_shader_parameter("organic_seed_offset", Vector2(
-		float(posmod(world_seed * 7 + 1871, 8192)),
-		float(posmod(world_seed * 11 + 3917, 8192))
-	))
-	var is_liquid: bool = bool(material_definition.get("liquid", false))
-	shader_material.set_shader_parameter("liquid_enabled", 1.0 if is_liquid else 0.0)
-	if is_liquid:
-		shader_material.set_shader_parameter(
-			"liquid_surface_tint",
-			Color(String(material_definition.get("liquid_surface_tint", "66aeca"))))
-		shader_material.set_shader_parameter(
-			"liquid_highlight_tint",
-			Color(String(material_definition.get("liquid_highlight_tint", "b8edf0"))))
-		shader_material.set_shader_parameter(
-			"liquid_calmness", clampf(float(
-				material_definition.get("visual_calmness", 0.8)), 0.0, 1.0))
-		shader_material.set_shader_parameter(
-			"liquid_pattern_frequency", maxf(0.00001, float(
-				material_definition.get("liquid_pattern_frequency", 0.01))))
-		shader_material.set_shader_parameter(
-			"liquid_shimmer_strength", clampf(float(
-				material_definition.get("liquid_shimmer_strength", 0.06)), 0.0, 0.2))
-		shader_material.set_shader_parameter(
-			"liquid_motion_enabled",
-			1.0 if bool(material_definition.get("liquid_motion_enabled", false)) else 0.0)
-		shader_material.set_shader_parameter(
-			"liquid_motion_speed", float(
-				material_definition.get("liquid_motion_speed", 0.0)))
-		shader_material.set_shader_parameter(
-			"shoreline_width", clampf(float(
-				material_definition.get("shoreline_width", 0.16)), 0.02, 0.3))
-		shader_material.set_shader_parameter(
-			"liquid_depth_effect_strength", clampf(float(
-				material_definition.get("depth_effect_strength", 0.0)), 0.0, 0.35))
-		shader_material.set_shader_parameter(
-			"liquid_emissive_strength", clampf(float(
-				material_definition.get("emissive_strength", 0.0)), 0.0, 1.0)
-				if bool(material_definition.get("emissive", false)) else 0.0)
-		_apply_water_enhancement_parameters(shader_material)
-	return shader_material
-
-
-func _generate_visual_variant(variant_definition: Dictionary, fallback_path: String) -> ImageTexture:
-	var texture_path: String = String(variant_definition.get("texture_path", fallback_path))
-	var source_texture: Texture2D = load(texture_path) as Texture2D
-	assert(source_texture != null, "Missing variant PNG: " + texture_path)
-	var image: Image = source_texture.get_image()
-	if image.get_width() != TILE_SIZE.x or image.get_height() != TILE_SIZE.y:
-		image.resize(TILE_SIZE.x, TILE_SIZE.y, Image.INTERPOLATE_NEAREST)
-	image.convert(Image.FORMAT_RGBA8)
-
-	var tint := Color(String(variant_definition.get("tint", "ffffff")))
-	var brightness: float = float(variant_definition.get("brightness", 1.0))
-	var contrast: float = float(variant_definition.get("contrast", 1.0))
-	for y in range(image.get_height()):
-		for x in range(image.get_width()):
-			var pigment: Color = image.get_pixel(x, y)
-			pigment.r = clampf(((pigment.r - 0.5) * contrast + 0.5) * tint.r * brightness, 0.0, 1.0)
-			pigment.g = clampf(((pigment.g - 0.5) * contrast + 0.5) * tint.g * brightness, 0.0, 1.0)
-			pigment.b = clampf(((pigment.b - 0.5) * contrast + 0.5) * tint.b * brightness, 0.0, 1.0)
-			image.set_pixel(x, y, pigment)
-	return ImageTexture.create_from_image(image)
-
-
-func _generate_cliff_atlas(
-		original: Texture2D, stone_style: bool,
-		shoreline: bool = false) -> ImageTexture:
-	var base: Image = original.get_image()
-	if base.get_width() != TILE_SIZE.x or base.get_height() != TILE_SIZE.y:
-		base.resize(TILE_SIZE.x, TILE_SIZE.y, Image.INTERPOLATE_NEAREST)
-	base.convert(Image.FORMAT_RGBA8)
-	var atlas := Image.create(TILE_SIZE.x * 32, HEIGHT_STEP * 2, false, Image.FORMAT_RGBA8)
-	atlas.fill(Color.TRANSPARENT)
-	for variant in range(32):
-		var cap_mask: int = variant & 3
-		var top_step: bool = (variant & 4) != 0
-		var style: int = variant >> 3
-		for y in range(HEIGHT_STEP):
-			for x in range(TILE_SIZE.x):
-				var boundary_offset: int = _cliff_boundary_offset(style, x)
-				var side_inset: int = _cliff_side_inset(style, y)
-				if ((cap_mask & 1) != 0 and x < side_inset
-						or (cap_mask & 2) != 0 and x >= TILE_SIZE.x - side_inset):
-					continue
-				if top_step and y < boundary_offset:
-					continue
-				var sample_y: int = posmod(
-					y * 2 + floori(float(x + style * 3) / 8.0) * 3 + style * 5,
-					TILE_SIZE.y)
-				var pigment: Color = base.get_pixel(x, sample_y)
-				var shade: float = (0.72 if stone_style else 0.70) - y * 0.006
-				shade += float(style - 1) * 0.012
-				if top_step and y <= boundary_offset + 1:
-					shade += 0.18 - maxi(0, y - boundary_offset) * 0.07
-				if y in [5 + (style & 1), 10 + ((style >> 1) & 1)]:
-					shade -= 0.045 # Restrained geological strata.
-				if y >= HEIGHT_STEP - 3:
-					var wall_contact_offset: int = _cliff_boundary_offset(style, x)
-					if y >= HEIGHT_STEP - 1 - wall_contact_offset:
-						shade -= 0.10 + float(
-							y - (HEIGHT_STEP - 1 - wall_contact_offset)) * 0.035
-				if shoreline and y >= HEIGHT_STEP - 2:
-					# A restrained wet contact band replaces a cast shadow at
-					# water boundaries and terminates the wall at sea level.
-					shade += 0.10
-					pigment = pigment.lerp(Color("9ab9b7"), 0.18)
-				var crack_hash: int = posmod(x * 11 + y * 23 + style * 37 + (19 if stone_style else 5), 97)
-				if crack_hash <= 1 and y > 2 and y < HEIGHT_STEP - 2:
-					shade -= 0.14
-				if (cap_mask & 1) != 0 and x < 5:
-					shade -= 0.16 - float(x) * 0.025
-				if (cap_mask & 2) != 0 and x >= TILE_SIZE.x - 5:
-					shade -= 0.16 - float(TILE_SIZE.x - 1 - x) * 0.025
-				pigment.r = clampf(pigment.r * shade, 0.0, 1.0)
-				pigment.g = clampf(pigment.g * shade, 0.0, 1.0)
-				pigment.b = clampf(pigment.b * shade, 0.0, 1.0)
-				pigment.a = 0.58 if (
-					((cap_mask & 1) != 0 and x == side_inset)
-					or ((cap_mask & 2) != 0 and x == TILE_SIZE.x - 1 - side_inset)) else 1.0
-				atlas.set_pixel(variant * TILE_SIZE.x + x, y, pigment)
-		for shadow_y in range(5):
-			for x in range(TILE_SIZE.x):
-				var shadow_contact_offset: int = _cliff_boundary_offset(style, x)
-				if shadow_y < shadow_contact_offset:
-					continue
-				var cap_fade: float = 1.0
-				if (cap_mask & 1) != 0:
-					cap_fade *= clampf(float(x + 1) / 5.0, 0.0, 1.0)
-				if (cap_mask & 2) != 0:
-					cap_fade *= clampf(float(TILE_SIZE.x - x) / 5.0, 0.0, 1.0)
-				var alpha: float = (
-					0.16 - (shadow_y - shadow_contact_offset) * 0.032) * cap_fade
-				var shadow_color := Color(0.055, 0.045, 0.04, alpha)
-				atlas.set_pixel(
-					variant * TILE_SIZE.x + x, HEIGHT_STEP + shadow_y,
-					shadow_color)
-	return ImageTexture.create_from_image(atlas)
-
-
-static func _cliff_boundary_offset(style: int, x: int) -> int:
-	# Pixel-quantised profile shared by the wall's upper treatment and lower
-	# contact shadow. Fixed endpoints keep adjacent atlas segments connected.
-	if x <= 1 or x >= TILE_SIZE.x - 2:
-		return 0
-	var segment: int = floori(float(x) / 4.0)
-	return [1, 0, 2, 1, 2, 0, 1, 0][posmod(segment + style * 3, 8)]
-
-
-static func _cliff_side_inset(style: int, y: int) -> int:
-	# Only terminal caps use this inset; connected neighbours remain full width.
-	return [2, 3, 1, 2][posmod(floori(float(y) / 3.0) + style, 4)]
-
-
-func _generate_cliff_edge_atlas(
-		original: Texture2D, stone_style: bool,
-		shoreline: bool = false) -> ImageTexture:
-	var base: Image = original.get_image()
-	if base.get_width() != TILE_SIZE.x or base.get_height() != TILE_SIZE.y:
-		base.resize(TILE_SIZE.x, TILE_SIZE.y, Image.INTERPOLATE_NEAREST)
-	base.convert(Image.FORMAT_RGBA8)
-	# Three bounded drop variants per existing edge style let physical side
-	# returns express height without adding nodes or rendering layers.
-	var atlas := Image.create(TILE_SIZE.x * 16, TILE_SIZE.y * 9, false, Image.FORMAT_RGBA8)
-	atlas.fill(Color.TRANSPARENT)
-	for variant in range(9):
-		var style: int = variant / 3
-		var drop: int = variant % 3 + 1
-		var row_offset: int = variant * TILE_SIZE.y
-		for edge_mask in range(1, 16):
-			var north_exposed: bool = (edge_mask & 1) != 0
-			var west_exposed: bool = (edge_mask & 2) != 0
-			var east_exposed: bool = (edge_mask & 4) != 0
-			var south_wall: bool = (edge_mask & 8) != 0
-			var lip_rows: int = 2 if style == TerrainChunkBuildJob.EDGE_STYLE_SIMPLIFIED else 3
-			var lip_start: int = 2 if style == TerrainChunkBuildJob.EDGE_STYLE_SIMPLIFIED else 0
-			var draw_north_lip: bool = north_exposed
-			if style == TerrainChunkBuildJob.EDGE_STYLE_SIMPLIFIED and west_exposed and east_exposed:
-				draw_north_lip = false
-			for y in range(TILE_SIZE.y):
-				if draw_north_lip and y >= lip_start and y < lip_start + lip_rows:
-					var lip_y: int = y - lip_start
-					for x in range(TILE_SIZE.x):
-						# Corner cells use a full tile atlas entry while the organic
-						# top surface may occupy only its supported half. Keep the lip
-						# over that half so it cannot project into empty water.
-						if west_exposed and x < TILE_SIZE.x * 3 / 8:
-							continue
-						if east_exposed and x >= TILE_SIZE.x * 5 / 8:
-							continue
-						var north_pigment: Color = base.get_pixel(
-							x, posmod(x * 3 + y * 5, TILE_SIZE.y))
-						var north_shade: float = (
-							(0.70 if stone_style else 0.67) if lip_y == 0
-							else (0.91 if lip_y == 1 else 1.08))
-						if shoreline:
-							north_pigment = north_pigment.lerp(Color("9fc8c5"), 0.18)
-						north_pigment.r *= north_shade
-						north_pigment.g *= north_shade
-						north_pigment.b *= north_shade
-						var lip_alpha: float = (
-							[0.44, 0.22][lip_y]
-							if style == TerrainChunkBuildJob.EDGE_STYLE_SIMPLIFIED
-							else [0.58, 0.42, 0.24][lip_y])
-						north_pigment.a = lip_alpha
-						atlas.set_pixel(
-							edge_mask * TILE_SIZE.x + x, row_offset + y,
-							north_pigment)
-
-				for side in range(2):
-					var side_exposed: bool = west_exposed if side == 0 else east_exposed
-					if not side_exposed:
-						continue
-					var return_width: int = _cliff_side_return_width(
-						style, drop, side, y, south_wall, north_exposed)
-					if return_width <= 0:
-						continue
-					for inset in range(return_width):
-						var x: int = inset if side == 0 else TILE_SIZE.x - 1 - inset
-						var pigment: Color = base.get_pixel(
-							posmod(inset * 5 + y + style * 3, TILE_SIZE.x),
-							posmod(y * 2 + side * 7 + drop * 5, TILE_SIZE.y))
-						# West returns face away from the notional light and east
-						# returns catch slightly more light. Both retain the source
-						# texture instead of substituting a flat grey connector.
-						var shade: float = (0.68 if side == 0 else 0.82) + inset * 0.035
-						if posmod(y + style * 2, 7) == 0:
-							shade -= 0.07
-						if posmod(y * 13 + inset * 19 + style * 11, 41) == 0:
-							shade -= 0.13
-						if not stone_style:
-							pigment = pigment.lerp(Color("7a4928"), 0.62)
-						if shoreline:
-							pigment = pigment.lerp(Color("8fb7b5"), 0.14)
-						pigment.r = clampf(pigment.r * shade, 0.0, 1.0)
-						pigment.g = clampf(pigment.g * shade, 0.0, 1.0)
-						pigment.b = clampf(pigment.b * shade, 0.0, 1.0)
-						pigment.a = 0.94 - float(inset) * 0.055
-						var atlas_x: int = edge_mask * TILE_SIZE.x + x
-						var atlas_y: int = row_offset + y
-						var existing: Color = atlas.get_pixel(atlas_x, atlas_y)
-						atlas.set_pixel(atlas_x, atlas_y, existing.blend(pigment))
-	return ImageTexture.create_from_image(atlas)
-
-
-static func _cliff_side_return_width(
-		style: int, drop: int, side: int, y: int,
-		south_wall: bool, north_exposed: bool) -> int:
-	# Narrow side-only faces bridge stepped diagonals; short tapered faces join
-	# them into the primary southern wall. Their limited width keeps every
-	# return deliberately foreshortened in the top-down projection.
-	if not south_wall:
-		# Side-only exposure is the vertical leg of a stepped diagonal. Carry a
-		# narrow textured face through the cell so adjacent upper ledges read as
-		# one boundary. A one-pixel organic break preserves the established
-		# single-level negative space without restoring a broad grey strip.
-		if drop == 1 and y == TILE_SIZE.y / 2 - 1:
-			return 0
-		var side_width: int = 2 + clampi(drop, 1, 3) / 2
-		if style == TerrainChunkBuildJob.EDGE_STYLE_SIMPLIFIED:
-			side_width = 2
-		if posmod(y + style * 3 + side * 2, 7) == 0:
-			side_width = maxi(1, side_width - 1)
-		return side_width
-	var depth: int = 5 + clampi(drop, 1, 3) * 2
-	if style == TerrainChunkBuildJob.EDGE_STYLE_SIMPLIFIED:
-		depth -= 2
-	var start_y: int = TILE_SIZE.y - depth
-	if y >= start_y:
-		var progress: float = float(y - start_y) / float(maxi(depth - 1, 1))
-		var width: int = 2 + floori(progress * float(2 + drop))
-		if style == TerrainChunkBuildJob.EDGE_STYLE_SIMPLIFIED:
-			width = mini(width, 4)
-		# Alternating one-pixel bites avoid a rectangular return silhouette.
-		if posmod(y + style * 3 + side * 2, 5) == 0:
-			width = maxi(1, width - 1)
-		return width
-	if north_exposed and y < 3:
-		return 2 if south_wall else 1
-	return 0
-
-
-static func _atlas_pos(mask: int) -> Vector2i:
-	return Vector2i(mask & 3, mask >> 2)
-
-
-func _generate_masked_atlas(original: Texture2D) -> ImageTexture:
-	var base: Image = original.get_image()
-	if base.get_width() != TILE_SIZE.x or base.get_height() != TILE_SIZE.y:
-		base.resize(TILE_SIZE.x, TILE_SIZE.y, Image.INTERPOLATE_NEAREST)
-	base.convert(Image.FORMAT_RGBA8)
-
-	var atlas: Image = Image.create(TILE_SIZE.x * 4, TILE_SIZE.y * 4, false, Image.FORMAT_RGBA8)
-	for mask in range(16):
-		var atlas_origin: Vector2i = _atlas_pos(mask) * TILE_SIZE
-		for y in range(TILE_SIZE.y):
-			for x in range(TILE_SIZE.x):
-				var pigment: Color = base.get_pixel(x, y)
-				var field: float = _mask_field(mask, x, y)
-				pigment.r = clampf(field, 0.0, 1.0)
-				pigment.a *= smoothstep(0.43, 0.57, field)
-				atlas.set_pixel(atlas_origin.x + x, atlas_origin.y + y, pigment)
-	return ImageTexture.create_from_image(atlas)
-
-
-static func _coverage(mask: int, x: int, y: int) -> float:
-	return smoothstep(0.43, 0.57, _mask_field(mask, x, y))
-
-
-static func _mask_field(mask: int, x: int, y: int) -> float:
-	# One universal scalar field for every material and every chunk. The field
-	# is encoded into the atlas for compatible world-space shader deformation.
-	var u: float = (float(x) + 0.5) / 32.0
-	var v: float = (float(y) + 0.5) / 32.0
-	var tl: float = 1.0 if (mask & 8) != 0 else 0.0
-	var tr: float = 1.0 if (mask & 4) != 0 else 0.0
-	var bl: float = 1.0 if (mask & 2) != 0 else 0.0
-	var br: float = 1.0 if (mask & 1) != 0 else 0.0
-	var top_value: float = lerpf(tl, tr, u)
-	var bottom_value: float = lerpf(bl, br, u)
-	var field: float = lerpf(top_value, bottom_value, v)
-	var wobble: float = 0.07 * sin(u * TAU * 3.0) * sin(v * TAU * 2.0)
-	return field + wobble
