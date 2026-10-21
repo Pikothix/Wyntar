@@ -5,6 +5,7 @@ extends SceneTree
 const Catalog = preload("res://scripts/terrain_catalog.gd")
 const TerrainChunkBuildJob = preload("res://scripts/terrain_chunk_build_job.gd")
 const TerrainRenderer = preload("res://scripts/terrain_renderer.gd")
+const CliffResourceFactory = preload("res://scripts/cliff_resource_factory.gd")
 
 var failures: Array[String] = []
 var priorities: Dictionary = {}
@@ -35,12 +36,12 @@ func _run() -> void:
 
 func _test_profile_function() -> void:
 	for style in range(4):
-		_expect(TerrainRenderer._cliff_boundary_offset(style, 0) == 0,
+		_expect(CliffResourceFactory._boundary_offset(style, 0, 32) == 0,
 			"left profile endpoint is seam-safe for style %d" % style)
-		_expect(TerrainRenderer._cliff_boundary_offset(style, 31) == 0,
+		_expect(CliffResourceFactory._boundary_offset(style, 31, 32) == 0,
 			"right profile endpoint is seam-safe for style %d" % style)
 		for x in range(32):
-			var offset: int = TerrainRenderer._cliff_boundary_offset(style, x)
+			var offset: int = CliffResourceFactory._boundary_offset(style, x, 32)
 			_expect(offset >= 0 and offset <= 2,
 				"profile remains pixel-quantised for style %d x %d" % [style, x])
 
