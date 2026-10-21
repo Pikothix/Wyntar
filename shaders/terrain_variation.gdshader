@@ -16,6 +16,18 @@ uniform float organic_boundaries_enabled : hint_range(0.0, 1.0) = 1.0;
 uniform float organic_edge_strength : hint_range(0.0, 0.18) = 0.08;
 uniform float organic_edge_frequency = 0.035;
 uniform vec2 organic_seed_offset = vec2(0.0);
+// Grass-only presentation controls. The source texture remains authoritative
+// for the legacy appearance; this branch selectively replaces its dark blade
+// pixels according to a continuous world-space cluster field.
+uniform float clustered_grass_detail_enabled : hint_range(0.0, 1.0) = 0.0;
+uniform float grass_clear_area_coverage : hint_range(0.0, 1.0) = 0.70;
+uniform float grass_detail_density : hint_range(0.0, 1.0) = 0.35;
+uniform float grass_cluster_scale = 0.004;
+uniform float grass_transition_softness : hint_range(0.0, 0.4) = 0.12;
+uniform float grass_clear_area_residual_density : hint_range(0.0, 1.0) = 0.04;
+uniform vec2 grass_detail_seed_offset = vec2(0.0);
+uniform float grass_detail_luma_threshold : hint_range(0.0, 1.0) = 0.50;
+uniform vec3 grass_clear_color : source_color = vec3(0.467, 0.682, 0.345);
 // Liquid parameters are inert for ordinary terrain. They keep liquid styling
 // data-driven and leave authoritative material/height ownership in scripts.
 uniform float liquid_enabled : hint_range(0.0, 1.0) = 0.0;
@@ -96,6 +108,48 @@ void fragment() {
     float mask_alpha = mix(
         masked_atlas.a, organic_alpha, clamp(organic_boundaries_enabled, 0.0, 1.0));
     vec3 surface_rgb = mix(original.rgb, varied.rgb, blend_amount);
+    if (clustered_grass_detail_enabled > 0.5) {
+        // Smooth value noise defines broad meadow regions. Its smoothstep
+        // remap makes the coverage control approximately percentile-like over
+        // representative areas while retaining continuous organic borders.
+        vec2 grass_pixel = floor(world_position) + vec2(0.5);
+        float cluster_noise = smooth_value_noise(
+            grass_pixel * grass_cluster_scale + grass_detail_seed_offset);
+        float cluster_rank = smoothstep(0.0, 1.0, cluster_noise);
+        float half_softness = max(grass_transition_softness * 0.5, 0.0001);
+        float dense_region = smoothstep(
+            grass_clear_area_coverage - half_softness,
+            grass_clear_area_coverage + half_softness,
+            cluster_rank);
+
+        // Density means retention relative to dark marks in the existing
+        // grass texture, not a percentage of all grass pixels. Grouping the
+        // roll into small world-space cells keeps surviving marks clustered.
+        float retention_probability = mix(
+            grass_clear_area_residual_density, grass_detail_density, dense_region);
+        vec2 detail_cell = floor(grass_pixel / vec2(4.0, 3.0));
+        // Bound the sine-hash input before its dot product. Large absolute
+        // world coordinates otherwise lose fractional precision on 32-bit
+        // Compatibility shaders and collapse the roll to zero. The paired
+        // prime periods remain much larger than the view and do not affect
+        // chunk-boundary continuity.
+        vec2 detail_hash_coordinate = mod(detail_cell, vec2(2039.0, 2029.0))
+            + mod(grass_detail_seed_offset, vec2(997.0, 991.0)) * 0.019
+            + vec2(37.0, -53.0);
+        float detail_roll = hash_value(detail_hash_coordinate);
+        float source_luma = dot(original.rgb, vec3(0.2126, 0.7152, 0.0722));
+        float dark_mark = 1.0 - smoothstep(
+            grass_detail_luma_threshold - 0.035,
+            grass_detail_luma_threshold + 0.025,
+            source_luma);
+        float suppress_mark = dark_mark * step(retention_probability, detail_roll);
+        // Preserve the active tint/variation delta while replacing only the
+        // suppressed source mark with the grass definition's clear palette.
+        vec3 clear_surface = clamp(
+            surface_rgb + grass_clear_color - original.rgb,
+            vec3(0.0), vec3(1.0));
+        surface_rgb = mix(surface_rgb, clear_surface, suppress_mark);
+    }
     if (liquid_enabled > 0.5) {
         // Broad world-space bands break tile repetition without per-cell nodes.
         // Motion is a single optional phase term and is quantised to retain the

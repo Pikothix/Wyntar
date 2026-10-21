@@ -60,6 +60,13 @@ var incremental_chunk_retirement_enabled: bool = true
 var texture_variation_enabled: bool = true
 var texture_variation_strength: float = 0.65
 var texture_variation_frequency: float = 0.0025
+var clustered_grass_detail_enabled: bool = true
+var grass_clear_area_coverage: float = 0.70
+var grass_detail_density: float = 0.35
+var grass_cluster_scale: float = 0.004
+var grass_transition_softness: float = 0.12
+var grass_clear_area_residual_density: float = 0.04
+var grass_detail_seed_offset: int = 48131
 var organic_boundaries_enabled: bool = true
 var organic_edge_strength: float = 0.08
 var organic_edge_frequency: float = 0.035
@@ -1028,6 +1035,36 @@ func set_texture_variation_enabled(enabled: bool) -> void:
 		visual_material.set_shader_parameter("variation_enabled", 1.0 if enabled else 0.0)
 
 
+func set_clustered_grass_detail_enabled(enabled: bool) -> void:
+	## Presentation-only rollback switch. The shared grass material updates
+	## without rebuilding chunks or changing authoritative terrain state.
+	clustered_grass_detail_enabled = enabled
+	_apply_clustered_grass_detail_parameters()
+
+
+func set_clustered_grass_detail_controls(
+		clear_coverage: float, detail_density: float, cluster_scale: float,
+		transition_softness: float, residual_density: float,
+		seed_offset: int) -> void:
+	grass_clear_area_coverage = clampf(clear_coverage, 0.0, 1.0)
+	grass_detail_density = clampf(detail_density, 0.0, 1.0)
+	grass_cluster_scale = clampf(cluster_scale, 0.0005, 0.02)
+	grass_transition_softness = clampf(transition_softness, 0.0, 0.4)
+	grass_clear_area_residual_density = clampf(residual_density, 0.0, 1.0)
+	grass_detail_seed_offset = seed_offset
+	_apply_clustered_grass_detail_parameters()
+
+
+func _apply_clustered_grass_detail_parameters() -> void:
+	if not visual_material_by_id.has(Catalog.DEFAULT_MATERIAL_ID):
+		return
+	var config: Dictionary = _terrain_surface_factory_config()["grass_detail"].duplicate()
+	config["world_seed"] = world_seed
+	TerrainSurfaceFactory.apply_clustered_grass_detail_parameters(
+		visual_material_by_id[Catalog.DEFAULT_MATERIAL_ID],
+		config, true)
+
+
 func set_organic_boundaries_enabled(enabled: bool) -> void:
 	organic_boundaries_enabled = enabled
 	for visual_material in visual_material_by_id.values():
@@ -1734,6 +1771,15 @@ func _terrain_surface_factory_config() -> Dictionary:
 		"texture_variation_enabled": texture_variation_enabled,
 		"texture_variation_strength": texture_variation_strength,
 		"texture_variation_frequency": texture_variation_frequency,
+		"grass_detail": {
+			"enabled": clustered_grass_detail_enabled,
+			"clear_area_coverage": grass_clear_area_coverage,
+			"detail_density": grass_detail_density,
+			"cluster_scale": grass_cluster_scale,
+			"transition_softness": grass_transition_softness,
+			"clear_area_residual_density": grass_clear_area_residual_density,
+			"seed_offset": grass_detail_seed_offset,
+		},
 		"organic_boundaries_enabled": organic_boundaries_enabled,
 		"organic_edge_strength": organic_edge_strength,
 		"organic_edge_frequency": organic_edge_frequency,

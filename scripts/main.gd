@@ -48,6 +48,15 @@ const DEMO_CENTER: Vector2 = Vector2(16.0, 16.0)
 @export_range(0.0, 1.0, 0.05) var texture_variation_strength: float = 0.65
 @export_range(0.0002, 0.02, 0.0001) var texture_variation_frequency: float = 0.0025
 
+@export_group("Clustered Grass Detail")
+@export var clustered_grass_detail_enabled: bool = true
+@export_range(0.0, 1.0, 0.01) var grass_clear_area_coverage: float = 0.70
+@export_range(0.0, 1.0, 0.01) var grass_detail_density: float = 0.35
+@export_range(0.0005, 0.02, 0.0005) var grass_cluster_scale: float = 0.004
+@export_range(0.0, 0.4, 0.01) var grass_transition_softness: float = 0.12
+@export_range(0.0, 1.0, 0.01) var grass_clear_area_residual_density: float = 0.04
+@export var grass_detail_seed_offset: int = 48131
+
 @export_group("Organic Boundaries")
 @export var organic_boundaries_enabled: bool = true
 @export_range(0.0, 0.18, 0.005) var organic_edge_strength: float = 0.08
@@ -203,6 +212,13 @@ func _configure_terrain_renderer(renderer: TerrainRenderer) -> void:
 	renderer.texture_variation_enabled = texture_variation_enabled
 	renderer.texture_variation_strength = texture_variation_strength
 	renderer.texture_variation_frequency = texture_variation_frequency
+	renderer.clustered_grass_detail_enabled = clustered_grass_detail_enabled
+	renderer.grass_clear_area_coverage = grass_clear_area_coverage
+	renderer.grass_detail_density = grass_detail_density
+	renderer.grass_cluster_scale = grass_cluster_scale
+	renderer.grass_transition_softness = grass_transition_softness
+	renderer.grass_clear_area_residual_density = grass_clear_area_residual_density
+	renderer.grass_detail_seed_offset = grass_detail_seed_offset
 	renderer.organic_boundaries_enabled = organic_boundaries_enabled
 	renderer.organic_edge_strength = organic_edge_strength
 	renderer.organic_edge_frequency = organic_edge_frequency

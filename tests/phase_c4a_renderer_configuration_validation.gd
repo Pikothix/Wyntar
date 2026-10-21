@@ -14,6 +14,9 @@ const SHARED_PROPERTIES: Array[StringName] = [
 	&"load_margin_chunks", &"unload_margin_chunks", &"chunks_created_per_frame",
 	&"max_chunk_processing_ms", &"chunk_work_quantum_cells", &"max_tile_cells_per_frame",
 	&"texture_variation_enabled", &"texture_variation_strength", &"texture_variation_frequency",
+	&"clustered_grass_detail_enabled", &"grass_clear_area_coverage",
+	&"grass_detail_density", &"grass_cluster_scale", &"grass_transition_softness",
+	&"grass_clear_area_residual_density", &"grass_detail_seed_offset",
 	&"organic_boundaries_enabled", &"organic_edge_strength", &"organic_edge_frequency",
 	&"experimental_water_enhancement_enabled", &"water_ripple_strength",
 	&"water_secondary_ripple_scale", &"water_ripple_drift_speed", &"water_glint_density",
@@ -32,6 +35,11 @@ const WATER_PROPERTIES: Array[StringName] = [
 	&"experimental_water_enhancement_enabled", &"water_ripple_strength",
 	&"water_secondary_ripple_scale", &"water_ripple_drift_speed",
 	&"water_glint_density", &"water_glint_brightness",
+]
+const GRASS_PROPERTIES: Array[StringName] = [
+	&"clustered_grass_detail_enabled", &"grass_clear_area_coverage",
+	&"grass_detail_density", &"grass_cluster_scale", &"grass_transition_softness",
+	&"grass_clear_area_residual_density", &"grass_detail_seed_offset",
 ]
 const CLIFF_PROPERTIES: Array[StringName] = [
 	&"procedural_cliff_materials_enabled", &"organic_cliff_geometry_enabled",
@@ -77,6 +85,8 @@ func _run() -> void:
 			"replacement receives configuration identical to startup")
 		_expect(_properties_match(startup_configuration, replacement_configuration, WATER_PROPERTIES),
 			"water configuration survives replacement")
+		_expect(_properties_match(startup_configuration, replacement_configuration, GRASS_PROPERTIES),
+			"clustered grass configuration survives replacement")
 		_expect(_properties_match(startup_configuration, replacement_configuration, CLIFF_PROPERTIES),
 			"cliff configuration survives replacement")
 		_expect(_properties_match(startup_configuration, replacement_configuration, PLACEMENT_PROPERTIES),
@@ -134,6 +144,13 @@ func _configure_distinct_fixture(main) -> void:
 	main.texture_variation_enabled = false
 	main.texture_variation_strength = 0.4
 	main.texture_variation_frequency = 0.0041
+	main.clustered_grass_detail_enabled = true
+	main.grass_clear_area_coverage = 0.63
+	main.grass_detail_density = 0.42
+	main.grass_cluster_scale = 0.0065
+	main.grass_transition_softness = 0.19
+	main.grass_clear_area_residual_density = 0.08
+	main.grass_detail_seed_offset = -3571
 	main.organic_boundaries_enabled = false
 	main.organic_edge_strength = 0.11
 	main.organic_edge_frequency = 0.047

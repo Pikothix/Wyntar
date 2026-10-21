@@ -55,6 +55,11 @@ const MATERIALS = [
     {
         "id": 3, "name": "Grass", "priority": 30, "texture_path": "res://art/grass.png",
         "variation_strength": 0.64, "variation_frequency_scale": 0.58,
+        # Only grass opts into the presentation-only clustered-detail branch.
+        # The threshold separates the source texture's dark blade pixels from
+        # its base meadow palette; the clear colour replaces suppressed marks.
+        "clustered_grass_detail": true, "grass_detail_luma_threshold": 0.50,
+        "grass_clear_color": "77ae58",
         "variants": [
             {"texture_path": "res://art/grass.png", "tint": "ffffff", "brightness": 1.00, "contrast": 1.00},
             {"texture_path": "res://art/grass.png", "tint": "e8f2c9", "brightness": 1.05, "contrast": 0.98},

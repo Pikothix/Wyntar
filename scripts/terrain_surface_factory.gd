@@ -55,6 +55,30 @@ static func apply_water_enhancement_parameters(material: ShaderMaterial, config:
 	material.set_shader_parameter("water_glint_brightness", float(config["glint_brightness"]))
 
 
+static func apply_clustered_grass_detail_parameters(
+		material: ShaderMaterial, config: Dictionary, eligible: bool) -> void:
+	## The renderer owns these presentation controls. The factory translates
+	## them into one shared grass-material state; non-grass materials remain on
+	## the legacy shader path even when the global experiment is enabled.
+	material.set_shader_parameter("clustered_grass_detail_enabled",
+		1.0 if eligible and bool(config["enabled"]) else 0.0)
+	material.set_shader_parameter("grass_clear_area_coverage",
+		clampf(float(config["clear_area_coverage"]), 0.0, 1.0))
+	material.set_shader_parameter("grass_detail_density",
+		clampf(float(config["detail_density"]), 0.0, 1.0))
+	material.set_shader_parameter("grass_cluster_scale",
+		clampf(float(config["cluster_scale"]), 0.0005, 0.02))
+	material.set_shader_parameter("grass_transition_softness",
+		clampf(float(config["transition_softness"]), 0.0, 0.4))
+	material.set_shader_parameter("grass_clear_area_residual_density",
+		clampf(float(config["clear_area_residual_density"]), 0.0, 1.0))
+	var world_seed: int = int(config["world_seed"])
+	var seed_offset: int = int(config["seed_offset"])
+	material.set_shader_parameter("grass_detail_seed_offset", Vector2(
+		float(posmod(world_seed * 13 + seed_offset * 17 + 2719, 8192)),
+		float(posmod(world_seed * 29 + seed_offset * 31 + 6421, 8192))))
+
+
 static func atlas_pos(mask: int) -> Vector2i:
 	return Vector2i(mask & 3, mask >> 2)
 
@@ -109,6 +133,14 @@ static func _create_visual_material(definition: Dictionary, tile_size: Vector2i,
 	material.set_shader_parameter("organic_seed_offset", Vector2(
 		float(posmod(world_seed * 7 + 1871, 8192)),
 		float(posmod(world_seed * 11 + 3917, 8192))))
+	var grass_config: Dictionary = config["grass_detail"].duplicate()
+	grass_config["world_seed"] = world_seed
+	var grass_eligible: bool = bool(definition.get("clustered_grass_detail", false))
+	apply_clustered_grass_detail_parameters(material, grass_config, grass_eligible)
+	material.set_shader_parameter("grass_detail_luma_threshold", clampf(
+		float(definition.get("grass_detail_luma_threshold", 0.5)), 0.0, 1.0))
+	material.set_shader_parameter("grass_clear_color", Color(String(
+		definition.get("grass_clear_color", "77ae58"))))
 	var is_liquid: bool = bool(definition.get("liquid", false))
 	material.set_shader_parameter("liquid_enabled", 1.0 if is_liquid else 0.0)
 	if is_liquid:
