@@ -12,6 +12,12 @@ const CONNECTED_PROFILE_STEP := 8
 const CONNECTED_COLUMN_COUNT := TILE_SIZE / CONNECTED_PROFILE_STEP
 const RETURN_PROFILE_STEP := 8
 const REFINED_RETURN_STEP := 16
+## Unified contours can differ vertically from the visible surface edge by the
+## sum of contour displacement (5 px), encoded mask relief (about 3 px), and
+## the factory-bounded organic alpha displacement (about 6 px). Extending the
+## face upward beneath the elevated surface closes that bounded projection gap
+## without widening the contour or covering unrelated ground.
+const UNIFIED_CREST_UNDERLAP := 14
 const HALO_MARGIN := 1
 const HALO_SIZE := CHUNK_SIZE + HALO_MARGIN * 2
 const HALO_CELL_COUNT := HALO_SIZE * HALO_SIZE
@@ -118,14 +124,6 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 	var local_x: int = cell_index % CHUNK_SIZE
 	var local_y: int = floori(float(cell_index) / CHUNK_SIZE)
 	if bool(state.unified_contours_enabled):
-		var owner_index: int = (
-			(local_y + HALO_MARGIN) * HALO_SIZE + local_x + HALO_MARGIN)
-		if _is_isolated_halo_sample(state.halo_heights, owner_index):
-			# Preserve the accepted Phase 3D caps and returns for isolated peaks.
-			state.unified_contours_enabled = false
-			_process_cell(state, cell_index)
-			state.unified_contours_enabled = true
-			return
 		_process_unified_contour_square(state, local_x, local_y)
 		if profiling_enabled:
 			state.face_construction_usec += Time.get_ticks_usec() - started_usec
@@ -267,9 +265,6 @@ static func _process_unified_contour_square(
 			and first_height == int(state.halo_heights[corner_indices[2]])
 			and first_height == int(state.halo_heights[corner_indices[3]])):
 		return
-	for index in corner_indices:
-		if _is_isolated_halo_sample(state.halo_heights, index):
-			return
 	var heights := PackedInt32Array()
 	var ids := PackedInt32Array()
 	for index in corner_indices:
@@ -327,20 +322,6 @@ static func _process_unified_contour_square(
 					state.triangle_count += (
 						state.buffers[render_elevation].indices.size() / 3 - triangles_before)
 					state.shadow_count += 1
-
-
-static func _is_isolated_halo_sample(halo_heights, index: int) -> bool:
-	var x: int = index % HALO_SIZE
-	var y: int = floori(float(index) / HALO_SIZE)
-	if x <= 0 or x >= HALO_SIZE - 1 or y <= 0 or y >= HALO_SIZE - 1:
-		return false
-	var height: int = int(halo_heights[index])
-	if height <= 0:
-		return false
-	for offset in [-HALO_SIZE, -1, 1, HALO_SIZE]:
-		if int(halo_heights[index + offset]) == height:
-			return false
-	return true
 
 
 static func _unified_contour_source(
@@ -491,7 +472,8 @@ static func _append_unified_contour_band(
 		world_cell: Vector2i, level: int, height_step: int,
 		profile_metrics: Dictionary, directional: bool = false) -> void:
 	_append_unified_offset_strip(
-		buffer, path, -2, height_step + 1, 5, 0.96, source_id, 0, 1.0,
+		buffer, path, -2 - UNIFIED_CREST_UNDERLAP, height_step + 1,
+		5, 0.96, source_id, 0, 1.0,
 		_hash_int(world_cell.x, world_cell.y, level, 0, 239), profile_metrics,
 		directional)
 
@@ -521,16 +503,16 @@ static func _append_unified_offset_strip(
 		diagonal_seed: int, profile_metrics: Dictionary,
 		directional: bool = false) -> void:
 	## Emit each segment independently. Pure vertical projection gives every
-	## shared crest endpoint the same foot endpoint; the bounded midpoint bow
-	## above prevents a vertical segment from collapsing to zero area.
+	## shared crest endpoint the same foot endpoint. The bounded upward underlap
+	## remains behind the upper surface, while lateral_depth gives vertical side
+	## returns real area instead of the previous unsigned one-pixel sliver.
 	for segment in range(path.size() - 1):
 		var first: Vector2 = path[segment]
 		var last: Vector2 = path[segment + 1]
 		var delta: Vector2 = last - first
 		var extrusion := Vector2(0, lower_y - upper_y)
 		if absf(delta.cross(extrusion)) < 1.0:
-			# This is reachable only after integer clamping at a square corner.
-			extrusion.x = 1 if lateral_depth > 0 else 0
+			extrusion += Vector2(delta.y, -delta.x).normalized() * lateral_depth
 		_append_quad(
 			buffer, first + Vector2(0, upper_y), last + Vector2(0, upper_y),
 			last + Vector2(0, upper_y) + extrusion,

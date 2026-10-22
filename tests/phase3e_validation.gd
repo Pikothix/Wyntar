@@ -63,8 +63,11 @@ func _test_corner_and_mixed_height_geometry() -> void:
 	heights[Vector2i(18, 18)] = 3
 	heights[Vector2i(19, 19)] = 3
 	var result: Dictionary = _build_fixture(Vector2i.ZERO, heights, materials, true)
-	_expect(int(result.face_count) > 0 and int(result.edge_component_count) > 0,
-		"mixed-height turns create unified batched components")
+	# Unified contours intentionally omit the duplicate Phase 3D crest strip.
+	# Isolated samples previously re-entered that legacy path and made the edge
+	# count non-zero accidentally; C4E keeps all samples on one contour path.
+	_expect(int(result.face_count) > 0,
+		"mixed-height turns create unified batched faces")
 	for key in ["meshes", "edge_meshes", "shadow_meshes"]:
 		for mesh in result[key]:
 			if mesh == null:
