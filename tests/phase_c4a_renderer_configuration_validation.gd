@@ -17,6 +17,14 @@ const SHARED_PROPERTIES: Array[StringName] = [
 	&"clustered_grass_detail_enabled", &"grass_clear_area_coverage",
 	&"grass_detail_density", &"grass_cluster_scale", &"grass_transition_softness",
 	&"grass_clear_area_residual_density", &"grass_detail_seed_offset",
+	&"organic_grass_color_variation_enabled", &"grass_broad_variation_scale",
+	&"grass_color_variation_strength", &"grass_fine_variation_strength",
+	&"grass_texture_repetition_correction_enabled",
+	&"terrain_texture_repetition_correction_enabled",
+	&"stochastic_terrain_detail_enabled",
+	&"remaining_terrain_detail_enabled", &"water_repetition_correction_enabled",
+	&"water_repetition_correction_strength", &"cliff_repetition_correction_enabled",
+	&"cliff_repetition_correction_strength",
 	&"organic_boundaries_enabled", &"organic_edge_strength", &"organic_edge_frequency",
 	&"experimental_water_enhancement_enabled", &"water_ripple_strength",
 	&"water_secondary_ripple_scale", &"water_ripple_drift_speed", &"water_glint_density",
@@ -40,6 +48,9 @@ const GRASS_PROPERTIES: Array[StringName] = [
 	&"clustered_grass_detail_enabled", &"grass_clear_area_coverage",
 	&"grass_detail_density", &"grass_cluster_scale", &"grass_transition_softness",
 	&"grass_clear_area_residual_density", &"grass_detail_seed_offset",
+	&"organic_grass_color_variation_enabled", &"grass_broad_variation_scale",
+	&"grass_color_variation_strength", &"grass_fine_variation_strength",
+	&"grass_texture_repetition_correction_enabled",
 ]
 const CLIFF_PROPERTIES: Array[StringName] = [
 	&"procedural_cliff_materials_enabled", &"organic_cliff_geometry_enabled",
@@ -151,6 +162,37 @@ func _configure_distinct_fixture(main) -> void:
 	main.grass_transition_softness = 0.19
 	main.grass_clear_area_residual_density = 0.08
 	main.grass_detail_seed_offset = -3571
+	main.organic_grass_color_variation_enabled = true
+	main.grass_broad_variation_scale = 0.0035
+	main.grass_color_variation_strength = 0.085
+	main.grass_fine_variation_strength = 0.026
+	main.grass_texture_repetition_correction_enabled = false
+	main.terrain_texture_repetition_correction_enabled = false
+	main.sand_texture_repetition_correction_enabled = false
+	main.sand_texture_repetition_correction_strength = 0.15
+	main.dirt_texture_repetition_correction_strength = 0.25
+	main.stone_texture_repetition_correction_enabled = false
+	main.stone_texture_repetition_correction_strength = 0.35
+	main.snow_texture_repetition_correction_strength = 0.45
+	main.mud_texture_repetition_correction_enabled = false
+	main.mud_texture_repetition_correction_strength = 0.55
+	main.gravel_texture_repetition_correction_strength = 0.65
+	main.stochastic_terrain_detail_enabled = false
+	main.sand_stochastic_detail_enabled = false
+	main.sand_stochastic_detail_intensity = 0.25
+	main.dirt_stochastic_detail_intensity = 0.35
+	main.stone_stochastic_detail_enabled = false
+	main.stone_stochastic_detail_intensity = 0.45
+	main.mud_stochastic_detail_intensity = 0.55
+	main.remaining_terrain_detail_enabled = false
+	main.snow_remaining_detail_enabled = false
+	main.snow_remaining_detail_strength = 0.62
+	main.gravel_remaining_detail_enabled = true
+	main.gravel_remaining_detail_strength = 0.73
+	main.water_repetition_correction_enabled = false
+	main.water_repetition_correction_strength = 0.44
+	main.cliff_repetition_correction_enabled = false
+	main.cliff_repetition_correction_strength = 0.81
 	main.organic_boundaries_enabled = false
 	main.organic_edge_strength = 0.11
 	main.organic_edge_frequency = 0.047
@@ -188,10 +230,54 @@ func _expect_configuration_matches_main(main, renderer, stage: String) -> void:
 			"%s applies %s from Main exports" % [stage, property_name])
 	_expect(renderer.profiling_enabled == main.chunk_profiling_enabled,
 		"%s applies chunk_profiling_enabled" % stage)
+	var expected_material_settings := {
+		1: {"enabled": main.sand_texture_repetition_correction_enabled,
+			"strength": main.sand_texture_repetition_correction_strength},
+		2: {"enabled": main.dirt_texture_repetition_correction_enabled,
+			"strength": main.dirt_texture_repetition_correction_strength},
+		4: {"enabled": main.stone_texture_repetition_correction_enabled,
+			"strength": main.stone_texture_repetition_correction_strength},
+		5: {"enabled": main.snow_texture_repetition_correction_enabled,
+			"strength": main.snow_texture_repetition_correction_strength},
+		6: {"enabled": main.mud_texture_repetition_correction_enabled,
+			"strength": main.mud_texture_repetition_correction_strength},
+		7: {"enabled": main.gravel_texture_repetition_correction_enabled,
+			"strength": main.gravel_texture_repetition_correction_strength},
+	}
+	_expect(renderer.terrain_texture_repetition_material_settings == expected_material_settings,
+		"%s applies material-specific G4 settings" % stage)
+	var expected_stochastic_settings := {
+		1: {"enabled": main.sand_stochastic_detail_enabled,
+			"intensity": main.sand_stochastic_detail_intensity},
+		2: {"enabled": main.dirt_stochastic_detail_enabled,
+			"intensity": main.dirt_stochastic_detail_intensity},
+		4: {"enabled": main.stone_stochastic_detail_enabled,
+			"intensity": main.stone_stochastic_detail_intensity},
+		6: {"enabled": main.mud_stochastic_detail_enabled,
+			"intensity": main.mud_stochastic_detail_intensity},
+	}
+	_expect(renderer.stochastic_terrain_detail_material_settings == expected_stochastic_settings,
+		"%s applies material-specific G5 settings" % stage)
+	var expected_remaining_settings := {
+		5: {"enabled": main.snow_remaining_detail_enabled,
+			"strength": main.snow_remaining_detail_strength},
+		7: {"enabled": main.gravel_remaining_detail_enabled,
+			"strength": main.gravel_remaining_detail_strength},
+	}
+	_expect(renderer.remaining_terrain_detail_material_settings == expected_remaining_settings,
+		"%s applies material-specific G6 settings" % stage)
 
 
 func _capture_configuration(renderer) -> Dictionary:
-	var result: Dictionary = {&"profiling_enabled": renderer.profiling_enabled}
+	var result: Dictionary = {
+		&"profiling_enabled": renderer.profiling_enabled,
+		&"terrain_texture_repetition_material_settings":
+			renderer.terrain_texture_repetition_material_settings.duplicate(true),
+		&"stochastic_terrain_detail_material_settings":
+			renderer.stochastic_terrain_detail_material_settings.duplicate(true),
+		&"remaining_terrain_detail_material_settings":
+			renderer.remaining_terrain_detail_material_settings.duplicate(true),
+	}
 	for property_name in SHARED_PROPERTIES:
 		result[property_name] = renderer.get(property_name)
 	return result

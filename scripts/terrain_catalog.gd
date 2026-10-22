@@ -35,6 +35,11 @@ const MATERIALS = [
     {
         "id": 1, "name": "Sand", "priority": 10, "texture_path": "res://art/sand.png",
         "variation_strength": 0.28, "variation_frequency_scale": 0.44,
+        "texture_repetition_correction": true, "texture_repetition_strength": 0.55,
+        "texture_repetition_scale": 0.0060,
+        "stochastic_detail": true, "stochastic_detail_style": 1,
+        "stochastic_base_color": "e4c381", "stochastic_detail_color": "a48758",
+        "stochastic_detail_density": 0.020, "stochastic_palette_variation": 0.040,
         "variants": [
             {"texture_path": "res://art/sand.png", "tint": "ffffff", "brightness": 1.00, "contrast": 1.00},
             {"texture_path": "res://art/sand.png", "tint": "fff3cf", "brightness": 1.03, "contrast": 0.97},
@@ -45,6 +50,11 @@ const MATERIALS = [
     {
         "id": 2, "name": "Dirt", "priority": 20, "texture_path": "res://art/dirt.png",
         "variation_strength": 0.52, "variation_frequency_scale": 0.72,
+        "texture_repetition_correction": true, "texture_repetition_strength": 0.65,
+        "texture_repetition_scale": 0.0055,
+        "stochastic_detail": true, "stochastic_detail_style": 2,
+        "stochastic_base_color": "8a6343", "stochastic_detail_color": "453429",
+        "stochastic_detail_density": 0.028, "stochastic_palette_variation": 0.050,
         "variants": [
             {"texture_path": "res://art/dirt.png", "tint": "ffffff", "brightness": 1.00, "contrast": 1.00},
             {"texture_path": "res://art/dirt.png", "tint": "efd8c2", "brightness": 1.03, "contrast": 0.98},
@@ -70,6 +80,11 @@ const MATERIALS = [
     {
         "id": 4, "name": "Stone", "priority": 40, "texture_path": "res://art/stone.png",
         "variation_strength": 0.66, "variation_frequency_scale": 1.05,
+        "texture_repetition_correction": true, "texture_repetition_strength": 0.55,
+        "texture_repetition_scale": 0.0045,
+        "stochastic_detail": true, "stochastic_detail_style": 3,
+        "stochastic_base_color": "909ba0", "stochastic_detail_color": "59656c",
+        "stochastic_detail_density": 0.034, "stochastic_palette_variation": 0.045,
         "variants": [
             {"texture_path": "res://art/stone.png", "tint": "ffffff", "brightness": 1.00, "contrast": 1.00},
             {"texture_path": "res://art/stone.png", "tint": "e3edf2", "brightness": 1.02, "contrast": 0.98},
@@ -80,6 +95,10 @@ const MATERIALS = [
     {
         "id": 5, "name": "Snow", "priority": 50, "texture_path": "res://art/snow.png",
         "variation_strength": 0.18, "variation_frequency_scale": 0.30,
+        "texture_repetition_correction": true, "texture_repetition_strength": 0.35,
+        "texture_repetition_scale": 0.0050,
+		"remaining_detail": true, "remaining_detail_style": 1,
+		"remaining_base_color": "f1f6f3", "remaining_detail_color": "dce9e9",
         "variants": [
             {"texture_path": "res://art/snow.png", "tint": "ffffff", "brightness": 1.00, "contrast": 1.00},
             {"texture_path": "res://art/snow.png", "tint": "eaf7ff", "brightness": 1.02, "contrast": 0.97},
@@ -90,6 +109,11 @@ const MATERIALS = [
     {
         "id": 6, "name": "Mud", "priority": 25, "texture_path": "res://art/mud.png",
         "variation_strength": 0.48, "variation_frequency_scale": 0.78,
+        "texture_repetition_correction": true, "texture_repetition_strength": 0.65,
+        "texture_repetition_scale": 0.0050,
+        "stochastic_detail": true, "stochastic_detail_style": 4,
+        "stochastic_base_color": "815e48", "stochastic_detail_color": "423e3c",
+        "stochastic_detail_density": 0.020, "stochastic_palette_variation": 0.040,
         "variants": [
             {"texture_path": "res://art/mud.png", "tint": "ffffff", "brightness": 1.00, "contrast": 1.00},
             {"texture_path": "res://art/mud.png", "tint": "e5d2b8", "brightness": 1.00, "contrast": 0.98},
@@ -100,6 +124,10 @@ const MATERIALS = [
     {
         "id": 7, "name": "Gravel", "priority": 35, "texture_path": "res://art/gravel.png",
         "variation_strength": 0.70, "variation_frequency_scale": 1.18,
+        "texture_repetition_correction": true, "texture_repetition_strength": 0.35,
+        "texture_repetition_scale": 0.0040,
+		"remaining_detail": true, "remaining_detail_style": 2,
+		"remaining_base_color": "a99f89", "remaining_detail_color": "625d58",
         "variants": [
             {"texture_path": "res://art/gravel.png", "tint": "ffffff", "brightness": 1.00, "contrast": 1.00},
             {"texture_path": "res://art/gravel.png", "tint": "e8e1d6", "brightness": 1.02, "contrast": 0.98},

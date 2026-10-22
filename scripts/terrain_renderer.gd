@@ -67,6 +67,36 @@ var grass_cluster_scale: float = 0.004
 var grass_transition_softness: float = 0.12
 var grass_clear_area_residual_density: float = 0.04
 var grass_detail_seed_offset: int = 48131
+var organic_grass_color_variation_enabled: bool = true
+var grass_broad_variation_scale: float = 0.0015
+var grass_color_variation_strength: float = 0.055
+var grass_fine_variation_strength: float = 0.018
+var grass_texture_repetition_correction_enabled: bool = true
+var terrain_texture_repetition_correction_enabled: bool = true
+var terrain_texture_repetition_material_settings: Dictionary = {
+	1: {"enabled": true, "strength": 0.55},
+	2: {"enabled": true, "strength": 0.65},
+	4: {"enabled": true, "strength": 0.55},
+	5: {"enabled": false, "strength": 0.35},
+	6: {"enabled": true, "strength": 0.65},
+	7: {"enabled": false, "strength": 0.35},
+}
+var stochastic_terrain_detail_enabled: bool = true
+var stochastic_terrain_detail_material_settings: Dictionary = {
+	1: {"enabled": true, "intensity": 0.95},
+	2: {"enabled": true, "intensity": 1.0},
+	4: {"enabled": true, "intensity": 1.0},
+	6: {"enabled": true, "intensity": 1.0},
+}
+var remaining_terrain_detail_enabled: bool = true
+var remaining_terrain_detail_material_settings: Dictionary = {
+	5: {"enabled": true, "strength": 0.90},
+	7: {"enabled": true, "strength": 1.0},
+}
+var water_repetition_correction_enabled: bool = true
+var water_repetition_correction_strength: float = 1.0
+var cliff_repetition_correction_enabled: bool = true
+var cliff_repetition_correction_strength: float = 0.95
 var organic_boundaries_enabled: bool = true
 var organic_edge_strength: float = 0.08
 var organic_edge_frequency: float = 0.035
@@ -1065,6 +1095,128 @@ func _apply_clustered_grass_detail_parameters() -> void:
 		config, true)
 
 
+func set_organic_grass_color_variation_enabled(enabled: bool) -> void:
+	## Presentation-only rollback switch. The shared grass material updates
+	## without rebuilding chunks or changing authoritative terrain state.
+	organic_grass_color_variation_enabled = enabled
+	_apply_organic_grass_color_variation_parameters()
+
+
+func set_organic_grass_color_variation_controls(
+		broad_scale: float, color_strength: float, fine_strength: float) -> void:
+	grass_broad_variation_scale = clampf(broad_scale, 0.0005, 0.01)
+	grass_color_variation_strength = clampf(color_strength, 0.0, 0.15)
+	grass_fine_variation_strength = clampf(fine_strength, 0.0, 0.08)
+	_apply_organic_grass_color_variation_parameters()
+
+
+func _apply_organic_grass_color_variation_parameters() -> void:
+	if not visual_material_by_id.has(Catalog.DEFAULT_MATERIAL_ID):
+		return
+	var config: Dictionary = _terrain_surface_factory_config()["grass_surface_variation"].duplicate()
+	config["world_seed"] = world_seed
+	TerrainSurfaceFactory.apply_organic_grass_color_variation_parameters(
+		visual_material_by_id[Catalog.DEFAULT_MATERIAL_ID], config, true)
+
+
+func set_grass_texture_repetition_correction_enabled(enabled: bool) -> void:
+	## Presentation-only G3 rollback. One shared material changes in place;
+	## authoritative terrain and streamed chunks remain untouched.
+	grass_texture_repetition_correction_enabled = enabled
+	_apply_grass_texture_repetition_parameters()
+
+
+func _apply_grass_texture_repetition_parameters() -> void:
+	if not visual_material_by_id.has(Catalog.DEFAULT_MATERIAL_ID):
+		return
+	TerrainSurfaceFactory.apply_grass_texture_repetition_parameters(
+		visual_material_by_id[Catalog.DEFAULT_MATERIAL_ID],
+		_terrain_surface_factory_config()["grass_texture_repetition"], true)
+
+
+func set_terrain_texture_repetition_correction_enabled(enabled: bool) -> void:
+	## Presentation-only G4 rollback; shared materials update without rebuilding
+	## chunks or touching authoritative terrain state.
+	terrain_texture_repetition_correction_enabled = enabled
+	_apply_terrain_texture_repetition_parameters()
+
+
+func set_terrain_texture_repetition_material_settings(settings: Dictionary) -> void:
+	terrain_texture_repetition_material_settings = settings.duplicate(true)
+	_apply_terrain_texture_repetition_parameters()
+
+
+func _apply_terrain_texture_repetition_parameters() -> void:
+	var config: Dictionary = _terrain_surface_factory_config()["terrain_texture_repetition"]
+	for definition in Catalog.MATERIALS:
+		var terrain_id: int = int(definition["id"])
+		if visual_material_by_id.has(terrain_id):
+			TerrainSurfaceFactory.apply_terrain_texture_repetition_parameters(
+				visual_material_by_id[terrain_id], config, definition)
+
+
+func set_stochastic_terrain_detail_enabled(enabled: bool) -> void:
+	## G5 replaces repetitive source detail only in presentation. Disabling it
+	## restores the exact G4 shader path without rebuilding streamed chunks.
+	stochastic_terrain_detail_enabled = enabled
+	_apply_stochastic_terrain_detail_parameters()
+
+
+func set_stochastic_terrain_detail_material_settings(settings: Dictionary) -> void:
+	stochastic_terrain_detail_material_settings = settings.duplicate(true)
+	_apply_stochastic_terrain_detail_parameters()
+
+
+func _apply_stochastic_terrain_detail_parameters() -> void:
+	var config: Dictionary = _terrain_surface_factory_config()["stochastic_terrain_detail"]
+	for definition in Catalog.MATERIALS:
+		var terrain_id: int = int(definition["id"])
+		if visual_material_by_id.has(terrain_id):
+			TerrainSurfaceFactory.apply_stochastic_terrain_detail_parameters(
+				visual_material_by_id[terrain_id], config, definition)
+
+
+func set_remaining_terrain_detail_enabled(enabled: bool) -> void:
+	## G6 presentation-only rollback for snow and gravel. Shared material state
+	## changes in place; terrain cells and streamed chunks remain authoritative.
+	remaining_terrain_detail_enabled = enabled
+	_apply_remaining_terrain_detail_parameters()
+
+
+func set_remaining_terrain_detail_material_settings(settings: Dictionary) -> void:
+	remaining_terrain_detail_material_settings = settings.duplicate(true)
+	_apply_remaining_terrain_detail_parameters()
+
+
+func _apply_remaining_terrain_detail_parameters() -> void:
+	var config: Dictionary = _terrain_surface_factory_config()["remaining_terrain_detail"]
+	for definition in Catalog.MATERIALS:
+		var terrain_id: int = int(definition["id"])
+		if visual_material_by_id.has(terrain_id):
+			TerrainSurfaceFactory.apply_remaining_terrain_detail_parameters(
+				visual_material_by_id[terrain_id], config, definition)
+
+
+func set_water_repetition_correction_enabled(enabled: bool) -> void:
+	water_repetition_correction_enabled = enabled
+	_apply_water_repetition_correction_parameters()
+
+
+func set_water_repetition_correction_strength(strength: float) -> void:
+	water_repetition_correction_strength = clampf(strength, 0.0, 1.0)
+	_apply_water_repetition_correction_parameters()
+
+
+func _apply_water_repetition_correction_parameters() -> void:
+	for terrain_id in visual_material_by_id:
+		if bool(liquid_by_id.get(int(terrain_id), false)):
+			TerrainSurfaceFactory.apply_water_repetition_correction_parameters(
+				visual_material_by_id[terrain_id], {
+					"enabled": water_repetition_correction_enabled,
+					"strength": water_repetition_correction_strength,
+				})
+
+
 func set_organic_boundaries_enabled(enabled: bool) -> void:
 	organic_boundaries_enabled = enabled
 	for visual_material in visual_material_by_id.values():
@@ -1117,6 +1269,29 @@ func set_procedural_cliff_materials_enabled(enabled: bool) -> void:
 		material.set_shader_parameter("procedural_enabled", enabled)
 	if organic_cliff_material != null:
 		organic_cliff_material.set_shader_parameter("procedural_enabled", enabled)
+
+
+func set_cliff_repetition_correction_enabled(enabled: bool) -> void:
+	cliff_repetition_correction_enabled = enabled
+	_apply_cliff_repetition_correction_parameters()
+
+
+func set_cliff_repetition_correction_strength(strength: float) -> void:
+	cliff_repetition_correction_strength = clampf(strength, 0.0, 1.0)
+	_apply_cliff_repetition_correction_parameters()
+
+
+func _apply_cliff_repetition_correction_parameters() -> void:
+	for material in cliff_material_by_source.values():
+		material.set_shader_parameter("texture_detail_reconstruction_enabled",
+			cliff_repetition_correction_enabled)
+		material.set_shader_parameter("texture_detail_reconstruction_strength",
+			cliff_repetition_correction_strength)
+	if organic_cliff_material != null:
+		organic_cliff_material.set_shader_parameter(
+			"texture_detail_reconstruction_enabled", cliff_repetition_correction_enabled)
+		organic_cliff_material.set_shader_parameter(
+			"texture_detail_reconstruction_strength", cliff_repetition_correction_strength)
 
 
 func is_procedural_cliff_materials_enabled() -> bool:
@@ -1780,6 +1955,27 @@ func _terrain_surface_factory_config() -> Dictionary:
 			"clear_area_residual_density": grass_clear_area_residual_density,
 			"seed_offset": grass_detail_seed_offset,
 		},
+		"grass_surface_variation": {
+			"enabled": organic_grass_color_variation_enabled,
+			"broad_scale": grass_broad_variation_scale,
+			"color_strength": grass_color_variation_strength,
+			"fine_strength": grass_fine_variation_strength,
+		},
+		"grass_texture_repetition": {
+			"enabled": grass_texture_repetition_correction_enabled,
+		},
+		"terrain_texture_repetition": {
+			"enabled": terrain_texture_repetition_correction_enabled,
+			"material_overrides": terrain_texture_repetition_material_settings,
+		},
+		"stochastic_terrain_detail": {
+			"enabled": stochastic_terrain_detail_enabled,
+			"material_overrides": stochastic_terrain_detail_material_settings,
+		},
+		"remaining_terrain_detail": {
+			"enabled": remaining_terrain_detail_enabled,
+			"material_overrides": remaining_terrain_detail_material_settings,
+		},
 		"organic_boundaries_enabled": organic_boundaries_enabled,
 		"organic_edge_strength": organic_edge_strength,
 		"organic_edge_frequency": organic_edge_frequency,
@@ -1790,6 +1986,8 @@ func _terrain_surface_factory_config() -> Dictionary:
 			"drift_speed": water_ripple_drift_speed,
 			"glint_density": water_glint_density,
 			"glint_brightness": water_glint_brightness,
+			"repetition_correction_enabled": water_repetition_correction_enabled,
+			"repetition_correction_strength": water_repetition_correction_strength,
 		},
 	}
 
@@ -1813,6 +2011,7 @@ func _build_shared_cliff_tileset() -> void:
 	cliff_material_by_source = resources["materials"]
 	cliff_shadow_material_by_source = resources["shadow_materials"]
 	organic_cliff_material = resources["organic_material"]
+	_apply_cliff_repetition_correction_parameters()
 
 
 func _build_shared_cliff_edge_tileset() -> void:

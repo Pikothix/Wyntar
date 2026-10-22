@@ -57,6 +57,52 @@ const DEMO_CENTER: Vector2 = Vector2(16.0, 16.0)
 @export_range(0.0, 1.0, 0.01) var grass_clear_area_residual_density: float = 0.04
 @export var grass_detail_seed_offset: int = 48131
 
+@export_group("Organic Grass Colour Variation")
+@export var organic_grass_color_variation_enabled: bool = true
+@export_range(0.0005, 0.01, 0.0005) var grass_broad_variation_scale: float = 0.0015
+@export_range(0.0, 0.15, 0.005) var grass_color_variation_strength: float = 0.055
+@export_range(0.0, 0.08, 0.002) var grass_fine_variation_strength: float = 0.018
+
+@export_group("Grass Texture Repetition")
+@export var grass_texture_repetition_correction_enabled: bool = true
+
+@export_group("Terrain Texture Repetition")
+@export var terrain_texture_repetition_correction_enabled: bool = true
+@export var sand_texture_repetition_correction_enabled: bool = true
+@export_range(0.0, 1.0, 0.05) var sand_texture_repetition_correction_strength: float = 0.55
+@export var dirt_texture_repetition_correction_enabled: bool = true
+@export_range(0.0, 1.0, 0.05) var dirt_texture_repetition_correction_strength: float = 0.65
+@export var stone_texture_repetition_correction_enabled: bool = true
+@export_range(0.0, 1.0, 0.05) var stone_texture_repetition_correction_strength: float = 0.55
+@export var snow_texture_repetition_correction_enabled: bool = false
+@export_range(0.0, 1.0, 0.05) var snow_texture_repetition_correction_strength: float = 0.35
+@export var mud_texture_repetition_correction_enabled: bool = true
+@export_range(0.0, 1.0, 0.05) var mud_texture_repetition_correction_strength: float = 0.65
+@export var gravel_texture_repetition_correction_enabled: bool = false
+@export_range(0.0, 1.0, 0.05) var gravel_texture_repetition_correction_strength: float = 0.35
+
+@export_group("Stochastic Terrain Detail")
+@export var stochastic_terrain_detail_enabled: bool = true
+@export var sand_stochastic_detail_enabled: bool = true
+@export_range(0.0, 1.0, 0.05) var sand_stochastic_detail_intensity: float = 0.95
+@export var dirt_stochastic_detail_enabled: bool = true
+@export_range(0.0, 1.0, 0.05) var dirt_stochastic_detail_intensity: float = 1.0
+@export var stone_stochastic_detail_enabled: bool = true
+@export_range(0.0, 1.0, 0.05) var stone_stochastic_detail_intensity: float = 1.0
+@export var mud_stochastic_detail_enabled: bool = true
+@export_range(0.0, 1.0, 0.05) var mud_stochastic_detail_intensity: float = 1.0
+
+@export_group("Remaining Terrain Repetition")
+@export var remaining_terrain_detail_enabled: bool = true
+@export var snow_remaining_detail_enabled: bool = true
+@export_range(0.0, 1.0, 0.05) var snow_remaining_detail_strength: float = 0.90
+@export var gravel_remaining_detail_enabled: bool = true
+@export_range(0.0, 1.0, 0.05) var gravel_remaining_detail_strength: float = 1.0
+@export var water_repetition_correction_enabled: bool = true
+@export_range(0.0, 1.0, 0.05) var water_repetition_correction_strength: float = 1.0
+@export var cliff_repetition_correction_enabled: bool = true
+@export_range(0.0, 1.0, 0.05) var cliff_repetition_correction_strength: float = 0.95
+
 @export_group("Organic Boundaries")
 @export var organic_boundaries_enabled: bool = true
 @export_range(0.0, 0.18, 0.005) var organic_edge_strength: float = 0.08
@@ -219,6 +265,52 @@ func _configure_terrain_renderer(renderer: TerrainRenderer) -> void:
 	renderer.grass_transition_softness = grass_transition_softness
 	renderer.grass_clear_area_residual_density = grass_clear_area_residual_density
 	renderer.grass_detail_seed_offset = grass_detail_seed_offset
+	renderer.organic_grass_color_variation_enabled = organic_grass_color_variation_enabled
+	renderer.grass_broad_variation_scale = grass_broad_variation_scale
+	renderer.grass_color_variation_strength = grass_color_variation_strength
+	renderer.grass_fine_variation_strength = grass_fine_variation_strength
+	renderer.grass_texture_repetition_correction_enabled = \
+		grass_texture_repetition_correction_enabled
+	renderer.terrain_texture_repetition_correction_enabled = \
+		terrain_texture_repetition_correction_enabled
+	renderer.terrain_texture_repetition_material_settings = {
+		1: {"enabled": sand_texture_repetition_correction_enabled,
+			"strength": sand_texture_repetition_correction_strength},
+		2: {"enabled": dirt_texture_repetition_correction_enabled,
+			"strength": dirt_texture_repetition_correction_strength},
+		4: {"enabled": stone_texture_repetition_correction_enabled,
+			"strength": stone_texture_repetition_correction_strength},
+		5: {"enabled": snow_texture_repetition_correction_enabled,
+			"strength": snow_texture_repetition_correction_strength},
+		6: {"enabled": mud_texture_repetition_correction_enabled,
+			"strength": mud_texture_repetition_correction_strength},
+		7: {"enabled": gravel_texture_repetition_correction_enabled,
+			"strength": gravel_texture_repetition_correction_strength},
+	}
+	renderer.stochastic_terrain_detail_enabled = stochastic_terrain_detail_enabled
+	renderer.stochastic_terrain_detail_material_settings = {
+		1: {"enabled": sand_stochastic_detail_enabled,
+			"intensity": sand_stochastic_detail_intensity},
+		2: {"enabled": dirt_stochastic_detail_enabled,
+			"intensity": dirt_stochastic_detail_intensity},
+		4: {"enabled": stone_stochastic_detail_enabled,
+			"intensity": stone_stochastic_detail_intensity},
+		6: {"enabled": mud_stochastic_detail_enabled,
+			"intensity": mud_stochastic_detail_intensity},
+	}
+	renderer.remaining_terrain_detail_enabled = remaining_terrain_detail_enabled
+	renderer.remaining_terrain_detail_material_settings = {
+		5: {"enabled": snow_remaining_detail_enabled,
+			"strength": snow_remaining_detail_strength},
+		7: {"enabled": gravel_remaining_detail_enabled,
+			"strength": gravel_remaining_detail_strength},
+	}
+	renderer.water_repetition_correction_enabled = water_repetition_correction_enabled
+	renderer.water_repetition_correction_strength = clampf(
+		water_repetition_correction_strength, 0.0, 1.0)
+	renderer.cliff_repetition_correction_enabled = cliff_repetition_correction_enabled
+	renderer.cliff_repetition_correction_strength = clampf(
+		cliff_repetition_correction_strength, 0.0, 1.0)
 	renderer.organic_boundaries_enabled = organic_boundaries_enabled
 	renderer.organic_edge_strength = organic_edge_strength
 	renderer.organic_edge_frequency = organic_edge_frequency

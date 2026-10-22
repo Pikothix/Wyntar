@@ -53,6 +53,18 @@ static func apply_water_enhancement_parameters(material: ShaderMaterial, config:
 	material.set_shader_parameter("water_ripple_drift_speed", float(config["drift_speed"]))
 	material.set_shader_parameter("water_glint_density", float(config["glint_density"]))
 	material.set_shader_parameter("water_glint_brightness", float(config["glint_brightness"]))
+	apply_water_repetition_correction_parameters(material, {
+		"enabled": bool(config.get("repetition_correction_enabled", false)),
+		"strength": float(config.get("repetition_correction_strength", 0.0)),
+	})
+
+
+static func apply_water_repetition_correction_parameters(
+		material: ShaderMaterial, config: Dictionary) -> void:
+	material.set_shader_parameter("water_repetition_correction_enabled",
+		1.0 if bool(config["enabled"]) else 0.0)
+	material.set_shader_parameter("water_repetition_correction_strength",
+		clampf(float(config["strength"]), 0.0, 1.0))
 
 
 static func apply_clustered_grass_detail_parameters(
@@ -77,6 +89,100 @@ static func apply_clustered_grass_detail_parameters(
 	material.set_shader_parameter("grass_detail_seed_offset", Vector2(
 		float(posmod(world_seed * 13 + seed_offset * 17 + 2719, 8192)),
 		float(posmod(world_seed * 29 + seed_offset * 31 + 6421, 8192))))
+
+
+static func apply_organic_grass_color_variation_parameters(
+		material: ShaderMaterial, config: Dictionary, eligible: bool) -> void:
+	## This is a grass-only presentation transform. It operates on the shared
+	## material, so chunk construction order cannot introduce visual seams.
+	material.set_shader_parameter("organic_grass_color_variation_enabled",
+		1.0 if eligible and bool(config["enabled"]) else 0.0)
+	material.set_shader_parameter("grass_broad_variation_scale",
+		clampf(float(config["broad_scale"]), 0.0005, 0.01))
+	material.set_shader_parameter("grass_color_variation_strength",
+		clampf(float(config["color_strength"]), 0.0, 0.15))
+	material.set_shader_parameter("grass_fine_variation_strength",
+		clampf(float(config["fine_strength"]), 0.0, 0.08))
+	var world_seed: int = int(config["world_seed"])
+	material.set_shader_parameter("grass_color_seed_offset", Vector2(
+		float(posmod(world_seed * 43 + 7187, 8192)),
+		float(posmod(world_seed * 61 + 3251, 8192))))
+
+
+static func apply_grass_texture_repetition_parameters(
+		material: ShaderMaterial, config: Dictionary, eligible: bool) -> void:
+	## G3 reconstructs only the grass background palette. Keeping the switch
+	## on the shared material gives exact rollback without chunk invalidation.
+	material.set_shader_parameter("grass_texture_repetition_correction_enabled",
+		1.0 if eligible and bool(config["enabled"]) else 0.0)
+
+
+static func apply_terrain_texture_repetition_parameters(
+		material: ShaderMaterial, config: Dictionary,
+		definition: Dictionary) -> void:
+	## G4 is presentation-only and material-aware. Definitions opt in with a
+	## reviewed default; runtime overrides provide explicit per-material control.
+	var terrain_id: int = int(definition["id"])
+	var overrides: Dictionary = config.get("material_overrides", {})
+	var material_config: Dictionary = overrides.get(terrain_id, {})
+	var eligible: bool = bool(definition.get("texture_repetition_correction", false))
+	var enabled: bool = bool(material_config.get("enabled", eligible))
+	var strength: float = float(material_config.get(
+		"strength", definition.get("texture_repetition_strength", 0.0)))
+	material.set_shader_parameter("terrain_texture_repetition_correction_enabled",
+		1.0 if bool(config["enabled"]) and eligible and enabled else 0.0)
+	material.set_shader_parameter("terrain_texture_repetition_correction_strength",
+		clampf(strength, 0.0, 1.0))
+	material.set_shader_parameter("terrain_texture_repetition_correction_scale",
+		clampf(float(definition.get("texture_repetition_scale", 0.005)), 0.001, 0.02))
+
+
+static func apply_stochastic_terrain_detail_parameters(
+		material: ShaderMaterial, config: Dictionary,
+		definition: Dictionary) -> void:
+	## G5 reconstructs only catalog-approved ordinary surfaces. Grass, water,
+	## snow, gravel, terrain masks, and authoritative data remain untouched.
+	var terrain_id: int = int(definition["id"])
+	var overrides: Dictionary = config.get("material_overrides", {})
+	var material_config: Dictionary = overrides.get(terrain_id, {})
+	var eligible: bool = bool(definition.get("stochastic_detail", false))
+	var enabled: bool = bool(material_config.get("enabled", eligible))
+	material.set_shader_parameter("stochastic_terrain_detail_enabled",
+		1.0 if bool(config["enabled"]) and eligible and enabled else 0.0)
+	material.set_shader_parameter("stochastic_terrain_detail_intensity", clampf(
+		float(material_config.get("intensity", 1.0)), 0.0, 1.0))
+	material.set_shader_parameter("stochastic_detail_style",
+		float(definition.get("stochastic_detail_style", 0)))
+	material.set_shader_parameter("stochastic_base_color", Color(String(
+		definition.get("stochastic_base_color", "ffffff"))))
+	material.set_shader_parameter("stochastic_detail_color", Color(String(
+		definition.get("stochastic_detail_color", "808080"))))
+	material.set_shader_parameter("stochastic_detail_density", clampf(
+		float(definition.get("stochastic_detail_density", 0.02)), 0.0, 0.12))
+	material.set_shader_parameter("stochastic_palette_variation", clampf(
+		float(definition.get("stochastic_palette_variation", 0.04)), 0.0, 0.10))
+
+
+static func apply_remaining_terrain_detail_parameters(
+		material: ShaderMaterial, config: Dictionary,
+		definition: Dictionary) -> void:
+	## G6 uses dedicated snow/gravel synthesis rather than the G5 ordinary-
+	## surface model. Catalog eligibility prevents spillover to other materials.
+	var terrain_id: int = int(definition["id"])
+	var overrides: Dictionary = config.get("material_overrides", {})
+	var material_config: Dictionary = overrides.get(terrain_id, {})
+	var eligible: bool = bool(definition.get("remaining_detail", false))
+	var enabled: bool = bool(material_config.get("enabled", eligible))
+	material.set_shader_parameter("remaining_terrain_detail_enabled",
+		1.0 if bool(config["enabled"]) and eligible and enabled else 0.0)
+	material.set_shader_parameter("remaining_terrain_detail_strength", clampf(
+		float(material_config.get("strength", 1.0)), 0.0, 1.0))
+	material.set_shader_parameter("remaining_detail_style",
+		float(definition.get("remaining_detail_style", 0)))
+	material.set_shader_parameter("remaining_base_color", Color(String(
+		definition.get("remaining_base_color", "ffffff"))))
+	material.set_shader_parameter("remaining_detail_color", Color(String(
+		definition.get("remaining_detail_color", "808080"))))
 
 
 static func atlas_pos(mask: int) -> Vector2i:
@@ -137,6 +243,18 @@ static func _create_visual_material(definition: Dictionary, tile_size: Vector2i,
 	grass_config["world_seed"] = world_seed
 	var grass_eligible: bool = bool(definition.get("clustered_grass_detail", false))
 	apply_clustered_grass_detail_parameters(material, grass_config, grass_eligible)
+	var grass_surface_config: Dictionary = config["grass_surface_variation"].duplicate()
+	grass_surface_config["world_seed"] = world_seed
+	apply_organic_grass_color_variation_parameters(
+		material, grass_surface_config, grass_eligible)
+	apply_grass_texture_repetition_parameters(
+		material, config["grass_texture_repetition"], grass_eligible)
+	apply_terrain_texture_repetition_parameters(
+		material, config["terrain_texture_repetition"], definition)
+	apply_stochastic_terrain_detail_parameters(
+		material, config["stochastic_terrain_detail"], definition)
+	apply_remaining_terrain_detail_parameters(
+		material, config["remaining_terrain_detail"], definition)
 	material.set_shader_parameter("grass_detail_luma_threshold", clampf(
 		float(definition.get("grass_detail_luma_threshold", 0.5)), 0.0, 1.0))
 	material.set_shader_parameter("grass_clear_color", Color(String(

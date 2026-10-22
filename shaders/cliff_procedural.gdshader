@@ -12,6 +12,10 @@ uniform bool shoreline = false;
 uniform bool contact_shadow = false;
 uniform bool geometry_mesh = false;
 uniform bool combined_geometry = false;
+// G6 replaces only the repeated 32px source pigment. The atlas continues to
+// own silhouette/opacity and the existing world-space geology remains intact.
+uniform bool texture_detail_reconstruction_enabled = false;
+uniform float texture_detail_reconstruction_strength : hint_range(0.0, 1.0) = 1.0;
 uniform vec2 seed_offset = vec2(0.0);
 // Reserved for camera integration. Broad planes and beds remain at every LOD;
 // only cracks and fine weathering respond to this value.
@@ -126,6 +130,19 @@ void fragment() {
 			} else {
 				pigment = texture(dirt_texture, source_uv).rgb;
 			}
+		}
+		if (texture_detail_reconstruction_enabled) {
+			vec2 bounded_pixel = mod(pixel, vec2(2039.0, 2029.0));
+			float pigment_macro = smooth_value_noise(
+				pixel * 0.026 + seed_offset * 0.031) - 0.5;
+			float pigment_fine = hash_value(
+				bounded_pixel + mod(seed_offset, vec2(997.0, 991.0)) * 0.047) - 0.5;
+			vec3 pigment_base = fragment_stone
+				? vec3(0.565, 0.608, 0.627) : vec3(0.541, 0.388, 0.263);
+			vec3 reconstructed_pigment = pigment_base
+				* (1.0 + pigment_macro * 0.11 + pigment_fine * 0.035);
+			pigment = mix(pigment, reconstructed_pigment,
+				texture_detail_reconstruction_strength);
 		}
 
 		float macro = smooth_value_noise(pixel * 0.018 + seed_offset);

@@ -28,6 +28,44 @@ uniform float grass_clear_area_residual_density : hint_range(0.0, 1.0) = 0.04;
 uniform vec2 grass_detail_seed_offset = vec2(0.0);
 uniform float grass_detail_luma_threshold : hint_range(0.0, 1.0) = 0.50;
 uniform vec3 grass_clear_color : source_color = vec3(0.467, 0.682, 0.345);
+// Grass-only world-space correction. A continuous coordinate warp breaks the
+// repeated 32px phase; two smooth fields add restrained seed-specific colour
+// variation without introducing cell-aligned blocks.
+uniform float organic_grass_color_variation_enabled : hint_range(0.0, 1.0) = 0.0;
+uniform float grass_broad_variation_scale = 0.0015;
+uniform float grass_color_variation_strength : hint_range(0.0, 0.15) = 0.055;
+uniform float grass_fine_variation_strength : hint_range(0.0, 0.08) = 0.018;
+uniform vec2 grass_color_seed_offset = vec2(0.0);
+// G3 replaces only the repeating source background with a restrained,
+// deterministic sample of the same grass palette. Dark G1 marks remain source
+// art. Disabling this uniform restores the exact G2 output path.
+uniform float grass_texture_repetition_correction_enabled
+    : hint_range(0.0, 1.0) = 0.0;
+// G4 decorrelates ordinary terrain motifs with a continuous world-space warp.
+// Material-specific eligibility and strength are supplied by the shared
+// factory. Grass retains its G3 branch and liquid retains its water branch.
+uniform float terrain_texture_repetition_correction_enabled
+    : hint_range(0.0, 1.0) = 0.0;
+uniform float terrain_texture_repetition_correction_strength
+    : hint_range(0.0, 1.0) = 0.0;
+uniform float terrain_texture_repetition_correction_scale = 0.005;
+// G5 replaces the repetitive fine-detail pixels of selected ordinary surfaces
+// with deterministic world-pixel grain. When disabled, the exact G4 sampling
+// path is retained.
+uniform float stochastic_terrain_detail_enabled : hint_range(0.0, 1.0) = 0.0;
+uniform float stochastic_terrain_detail_intensity : hint_range(0.0, 1.0) = 1.0;
+uniform float stochastic_detail_style = 0.0;
+uniform vec3 stochastic_base_color : source_color = vec3(1.0);
+uniform vec3 stochastic_detail_color : source_color = vec3(0.5);
+uniform float stochastic_detail_density : hint_range(0.0, 0.12) = 0.02;
+uniform float stochastic_palette_variation : hint_range(0.0, 0.10) = 0.04;
+// G6 gives snow and gravel separate reconstruction styles. Snow receives only
+// restrained grain; gravel receives sparse, irregular multi-pixel fragments.
+uniform float remaining_terrain_detail_enabled : hint_range(0.0, 1.0) = 0.0;
+uniform float remaining_terrain_detail_strength : hint_range(0.0, 1.0) = 1.0;
+uniform float remaining_detail_style = 0.0;
+uniform vec3 remaining_base_color : source_color = vec3(1.0);
+uniform vec3 remaining_detail_color : source_color = vec3(0.5);
 // Liquid parameters are inert for ordinary terrain. They keep liquid styling
 // data-driven and leave authoritative material/height ownership in scripts.
 uniform float liquid_enabled : hint_range(0.0, 1.0) = 0.0;
@@ -50,6 +88,8 @@ uniform float water_secondary_ripple_scale : hint_range(0.5, 6.0) = 2.4;
 uniform float water_ripple_drift_speed : hint_range(0.0, 2.0) = 0.55;
 uniform float water_glint_density : hint_range(0.0, 1.0) = 0.14;
 uniform float water_glint_brightness : hint_range(0.0, 1.0) = 0.38;
+uniform float water_repetition_correction_enabled : hint_range(0.0, 1.0) = 0.0;
+uniform float water_repetition_correction_strength : hint_range(0.0, 1.0) = 1.0;
 // Negative uses Godot's global TIME. Tests may provide a fixed non-negative
 // time so before/after captures compare the same animation instant.
 uniform float water_animation_time_override = -1.0;
@@ -59,6 +99,15 @@ varying vec2 world_position;
 
 float hash_value(vec2 point) {
     return fract(sin(dot(point, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+
+float stochastic_hash_value(vec2 point) {
+    // Polynomial hash avoids the broad diagonal precision bands produced by
+    // sine hashes on large Compatibility-renderer fragment coordinates.
+    vec3 point3 = fract(vec3(point.x, point.y, point.x) * vec3(0.1031, 0.1030, 0.0973));
+    point3 += dot(point3, point3.yxz + vec3(33.33));
+    return fract((point3.x + point3.y) * point3.z);
 }
 
 
@@ -91,8 +140,36 @@ void vertex() {
 
 void fragment() {
     vec4 masked_atlas = COLOR;
+    vec2 world_pixel = floor(world_position) + vec2(0.5);
+    vec2 grass_texture_warp = vec2(0.0);
+    if (organic_grass_color_variation_enabled > 0.5) {
+        // A slowly changing coordinate warp breaks the exact 32px source
+        // phase while retaining its pixel-art marks. It is continuous in
+        // world space, unlike choosing a random phase per tile or chunk.
+        vec2 warp_coordinate = world_pixel * grass_broad_variation_scale * 2.4;
+        grass_texture_warp = (vec2(
+            smooth_value_noise(warp_coordinate + grass_color_seed_offset * 0.71),
+            smooth_value_noise(warp_coordinate + grass_color_seed_offset * 0.37
+                + vec2(83.0, -59.0))) - 0.5) * 16.0;
+    }
     // The +16 phase matches the original half-tile-shifted dual-grid texture.
-    vec2 tiled_uv = (world_position + vec2(16.0)) / 32.0;
+    vec2 terrain_texture_warp = vec2(0.0);
+    if (terrain_texture_repetition_correction_enabled > 0.5
+            && stochastic_terrain_detail_enabled <= 0.5
+            && remaining_terrain_detail_enabled <= 0.5) {
+        // Smooth coordinates preserve continuity across tiles, chunks, and
+        // material masks. Quantised world pixels retain the pixel-art sample.
+        vec2 terrain_warp_coordinate = world_pixel
+            * terrain_texture_repetition_correction_scale;
+        terrain_texture_warp = (vec2(
+            smooth_value_noise(terrain_warp_coordinate + seed_offset * 0.023),
+            smooth_value_noise(terrain_warp_coordinate * 1.37
+                + seed_offset * 0.041 + vec2(47.0, -73.0))) - 0.5)
+            * (28.0 * terrain_texture_repetition_correction_strength);
+    }
+    vec2 texture_position = world_position + vec2(16.0)
+        + grass_texture_warp + terrain_texture_warp;
+    vec2 tiled_uv = texture_position / 32.0;
     vec4 original = texture(base_texture, tiled_uv);
     float noise_value = smooth_value_noise(world_position * variation_frequency + seed_offset);
     vec4 varied = sample_variant_ramp(tiled_uv, noise_value);
@@ -100,7 +177,6 @@ void fragment() {
     // Quantising the lookup to world pixels keeps magnified edges crisp. A
     // single signed offset is applied to the encoded scalar field for every
     // material; subset masks therefore remain subsets after deformation.
-    vec2 world_pixel = floor(world_position) + vec2(0.5);
     float organic_noise = smooth_value_noise(
         world_pixel * organic_edge_frequency + organic_seed_offset) * 2.0 - 1.0;
     float organic_alpha = smoothstep(
@@ -108,6 +184,120 @@ void fragment() {
     float mask_alpha = mix(
         masked_atlas.a, organic_alpha, clamp(organic_boundaries_enabled, 0.0, 1.0));
     vec3 surface_rgb = mix(original.rgb, varied.rgb, blend_amount);
+	if (stochastic_terrain_detail_enabled > 0.5) {
+		// Preserve the existing broad variant tint while discarding the source
+		// tile's repeated fine-detail coordinates. Hashes operate on bounded
+		// world pixels for stable precision in large streamed worlds.
+		vec2 detail_pixel = mod(world_pixel, vec2(2039.0, 2029.0));
+		vec2 detail_seed = mod(seed_offset, vec2(997.0, 991.0));
+		float pixel_roll = stochastic_hash_value(detail_pixel + detail_seed * 0.053
+			+ vec2(stochastic_detail_style * 31.0, -17.0));
+		float left_roll = stochastic_hash_value(detail_pixel - vec2(1.0, 0.0)
+			+ detail_seed * 0.053 + vec2(stochastic_detail_style * 31.0, -17.0));
+		float left_two_roll = stochastic_hash_value(detail_pixel - vec2(2.0, 0.0)
+			+ detail_seed * 0.053 + vec2(stochastic_detail_style * 31.0, -17.0));
+		float upper_roll = stochastic_hash_value(detail_pixel - vec2(0.0, 1.0)
+			+ detail_seed * 0.053 + vec2(stochastic_detail_style * 31.0, -17.0));
+		float link_roll = stochastic_hash_value(detail_pixel + detail_seed * 0.097
+			+ vec2(-53.0, 79.0));
+		float detail_mask = step(1.0 - stochastic_detail_density, pixel_roll);
+		if (stochastic_detail_style > 1.5 && stochastic_detail_style < 2.5) {
+			// Dirt gains occasional two-pixel grains in either axis.
+			detail_mask = max(detail_mask,
+				step(1.0 - stochastic_detail_density * 0.55, left_roll)
+				* step(0.46, link_roll));
+			detail_mask = max(detail_mask,
+				step(1.0 - stochastic_detail_density * 0.40, upper_roll)
+				* step(0.63, link_roll));
+		} else if (stochastic_detail_style > 2.5
+				&& stochastic_detail_style < 3.5) {
+			// Stone keeps sparse horizontal mineral flecks without fixed rows.
+			detail_mask = max(detail_mask,
+				step(1.0 - stochastic_detail_density * 0.80, left_roll)
+				* step(0.32, link_roll));
+			detail_mask = max(detail_mask,
+				step(1.0 - stochastic_detail_density * 0.40, left_two_roll)
+				* step(0.71, link_roll));
+		} else if (stochastic_detail_style > 3.5) {
+			// Mud uses fewer, softer paired pores than dirt.
+			detail_mask = max(detail_mask,
+				step(1.0 - stochastic_detail_density * 0.35, left_roll)
+				* step(0.58, link_roll));
+		}
+		float broad_grain = smooth_value_noise(
+			world_pixel * 0.013 + detail_seed * 0.021) - 0.5;
+		float fine_grain = stochastic_hash_value(detail_pixel + detail_seed * 0.071
+			+ vec2(89.0, -37.0)) - 0.5;
+		float palette_shift = broad_grain * stochastic_palette_variation
+			+ fine_grain * stochastic_palette_variation * 0.42;
+		vec3 variant_delta = surface_rgb - original.rgb;
+		vec3 procedural_base = clamp(
+			stochastic_base_color * (1.0 + palette_shift) + variant_delta,
+			vec3(0.0), vec3(1.0));
+		vec3 procedural_surface = mix(
+			procedural_base, stochastic_detail_color + variant_delta,
+			detail_mask);
+		surface_rgb = mix(surface_rgb, procedural_surface,
+			stochastic_terrain_detail_intensity);
+	}
+	if (remaining_terrain_detail_enabled > 0.5) {
+		vec2 detail_pixel = mod(world_pixel, vec2(2039.0, 2029.0));
+		vec2 detail_seed = mod(seed_offset, vec2(997.0, 991.0));
+		vec3 variant_delta = surface_rgb - original.rgb;
+		float broad = smooth_value_noise(
+			world_pixel * 0.021 + detail_seed * 0.031) - 0.5;
+		float fine = stochastic_hash_value(detail_pixel + detail_seed * 0.067
+			+ vec2(71.0, -43.0)) - 0.5;
+		vec3 procedural_surface;
+		if (remaining_detail_style < 1.5) {
+			// Snow stays bright and smooth: broad drift carries most of the
+			// variation and the pixel grain is deliberately low contrast.
+			float snow_shift = broad * 0.038 + fine * 0.010;
+			procedural_surface = clamp(
+				remaining_base_color * (1.0 + snow_shift) + variant_delta,
+				vec3(0.0), vec3(1.0));
+			float snow_grain = step(0.986, fine + 0.5);
+			procedural_surface = mix(
+				procedural_surface, remaining_detail_color + variant_delta,
+				snow_grain * 0.22);
+		} else {
+			// Independent world-pixel anchors grow into short fragments. Their
+			// orientation and length are hash-selected, so no placement grid or
+			// repeated diagonal survives from the source tile.
+			vec2 anchor_seed = detail_seed * 0.049 + vec2(-37.0, 83.0);
+			float here = stochastic_hash_value(detail_pixel + anchor_seed);
+			float left = stochastic_hash_value(detail_pixel - vec2(1.0, 0.0) + anchor_seed);
+			float left_two = stochastic_hash_value(detail_pixel - vec2(2.0, 0.0) + anchor_seed);
+			float above = stochastic_hash_value(detail_pixel - vec2(0.0, 1.0) + anchor_seed);
+			float diagonal = stochastic_hash_value(detail_pixel - vec2(1.0, 1.0) + anchor_seed);
+			float fragment = step(0.947, here);
+			fragment = max(fragment, step(0.965, left)
+				* step(0.48, stochastic_hash_value(detail_pixel + anchor_seed + vec2(19.0, 41.0))));
+			fragment = max(fragment, step(0.982, left_two)
+				* step(0.70, stochastic_hash_value(detail_pixel + anchor_seed + vec2(-61.0, 23.0))));
+			fragment = max(fragment, step(0.972, above)
+				* step(0.58, stochastic_hash_value(detail_pixel + anchor_seed + vec2(47.0, -29.0))));
+			fragment = max(fragment, step(0.986, diagonal));
+			float gravel_shift = broad * 0.075 + fine * 0.025;
+			vec3 gravel_base = clamp(
+				remaining_base_color * (1.0 + gravel_shift) + variant_delta,
+				vec3(0.0), vec3(1.0));
+			float fragment_tone = stochastic_hash_value(
+				detail_pixel + anchor_seed + vec2(101.0, -73.0));
+			vec3 fragment_color = mix(
+				remaining_detail_color * 0.82,
+				remaining_detail_color * 1.24, fragment_tone) + variant_delta;
+			procedural_surface = mix(gravel_base, fragment_color, fragment);
+		}
+		surface_rgb = mix(surface_rgb, procedural_surface,
+			remaining_terrain_detail_strength);
+	}
+	float grass_source_luma = dot(original.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float grass_dark_mark = 1.0 - smoothstep(
+		grass_detail_luma_threshold - 0.035,
+		grass_detail_luma_threshold + 0.025,
+		grass_source_luma);
+	float grass_suppress_mark = 0.0;
     if (clustered_grass_detail_enabled > 0.5) {
         // Smooth value noise defines broad meadow regions. Its smoothstep
         // remap makes the coverage control approximately percentile-like over
@@ -137,18 +327,53 @@ void fragment() {
             + mod(grass_detail_seed_offset, vec2(997.0, 991.0)) * 0.019
             + vec2(37.0, -53.0);
         float detail_roll = hash_value(detail_hash_coordinate);
-        float source_luma = dot(original.rgb, vec3(0.2126, 0.7152, 0.0722));
-        float dark_mark = 1.0 - smoothstep(
-            grass_detail_luma_threshold - 0.035,
-            grass_detail_luma_threshold + 0.025,
-            source_luma);
-        float suppress_mark = dark_mark * step(retention_probability, detail_roll);
+		grass_suppress_mark = grass_dark_mark * step(retention_probability, detail_roll);
         // Preserve the active tint/variation delta while replacing only the
         // suppressed source mark with the grass definition's clear palette.
         vec3 clear_surface = clamp(
             surface_rgb + grass_clear_color - original.rgb,
             vec3(0.0), vec3(1.0));
-        surface_rgb = mix(surface_rgb, clear_surface, suppress_mark);
+		surface_rgb = mix(surface_rgb, clear_surface, grass_suppress_mark);
+	}
+	if (grass_texture_repetition_correction_enabled > 0.5) {
+		// The source tile's light pixels form the visible diagonal lattice. G3
+		// resynthesises those background pixels from their established clear
+		// colour while keeping all retained dark marks untouched. Pixel-quantised
+		// world coordinates make the grain stable under camera motion and zoom.
+		float background_weight = 1.0
+			- grass_dark_mark * (1.0 - grass_suppress_mark);
+		vec2 grain_coordinate = mod(world_pixel, vec2(2039.0, 2029.0))
+			+ mod(grass_color_seed_offset, vec2(997.0, 991.0)) * 0.071;
+		float clustered_grain = smooth_value_noise(
+			grain_coordinate * 0.31 + vec2(17.0, -43.0));
+		float pixel_grain = hash_value(grain_coordinate + vec2(-29.0, 61.0));
+		float palette_shift = (clustered_grain - 0.5) * 0.10
+			+ (pixel_grain - 0.5) * 0.035;
+		vec3 stochastic_background = clamp(
+			grass_clear_color * (1.0 + palette_shift), vec3(0.0), vec3(1.0));
+		surface_rgb = mix(
+			surface_rgb, stochastic_background, 0.86 * background_weight);
+	}
+	if (organic_grass_color_variation_enabled > 0.5) {
+		// Retained G1 dark marks are left intact. Suppressed marks count as
+		// background, keeping G1's density and cluster controls independent.
+		float background_weight = 1.0
+			- grass_dark_mark * (1.0 - grass_suppress_mark);
+		float broad_primary = smooth_value_noise(
+			world_pixel * grass_broad_variation_scale + grass_color_seed_offset);
+		float broad_secondary = smooth_value_noise(
+			world_pixel * grass_broad_variation_scale * 2.17
+			+ grass_color_seed_offset * 0.43 + vec2(19.0, -31.0));
+		float broad_field = (broad_primary * 0.72
+			+ broad_secondary * 0.28 - 0.5) * 2.0;
+		float fine_field = (smooth_value_noise(
+			world_pixel * grass_broad_variation_scale * 7.3
+			+ grass_color_seed_offset * 0.19 + vec2(-47.0, 23.0)) - 0.5) * 2.0;
+		vec3 color_shift = broad_field * grass_color_variation_strength
+			* vec3(0.55, 1.0, 0.42)
+			+ fine_field * grass_fine_variation_strength
+			* vec3(0.35, 0.70, 0.28);
+		surface_rgb += color_shift * background_weight;
     }
     if (liquid_enabled > 0.5) {
         // Broad world-space bands break tile repetition without per-cell nodes.
@@ -158,6 +383,19 @@ void fragment() {
             ? water_animation_time_override : TIME;
         float motion_phase = water_time * liquid_motion_speed * liquid_motion_enabled;
         vec2 liquid_pixel = floor(world_position) + vec2(0.5);
+		if (water_repetition_correction_enabled > 0.5) {
+			// Static world-space colour replaces only the tiled source pigment.
+			// Existing wave phases below remain the sole animated component.
+			float water_broad = smooth_value_noise(
+				liquid_pixel * 0.018 + seed_offset * 0.043) - 0.5;
+			float water_fine = smooth_value_noise(
+				liquid_pixel * 0.071 + seed_offset * 0.019 + vec2(29.0, -53.0)) - 0.5;
+			vec3 reconstructed_water = clamp(liquid_surface_tint
+				* (1.0 + water_broad * 0.10 + water_fine * 0.035),
+				vec3(0.0), vec3(1.0));
+			surface_rgb = mix(surface_rgb, reconstructed_water,
+				water_repetition_correction_strength);
+		}
         float band = sin(
             dot(liquid_pixel, vec2(liquid_pattern_frequency, liquid_pattern_frequency * 0.43))
             + motion_phase);
