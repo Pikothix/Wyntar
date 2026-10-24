@@ -4,6 +4,7 @@ extends Node2D
 
 signal authoritative_state_changed
 signal cliff_height_profile_changed(height_step: int)
+signal cliff_rendering_mode_changed(mode: int)
 
 const Catalog = preload("res://scripts/terrain_catalog.gd")
 const TerrainGenerator = preload("res://scripts/terrain_generator.gd")
@@ -32,6 +33,13 @@ enum CliffHeightProfile {
 	BASELINE,
 	MODERATE,
 	PROMINENT,
+}
+
+enum CliffRenderingMode {
+	LEGACY,
+	GRID,
+	UNIFIED,
+	STYLISED,
 }
 
 var world_seed: int = 84521
@@ -93,6 +101,13 @@ var remaining_terrain_detail_material_settings: Dictionary = {
 	5: {"enabled": true, "strength": 0.90},
 	7: {"enabled": true, "strength": 1.0},
 }
+var terrain_noise_refinement_enabled: bool = true
+var terrain_noise_refinement_material_settings: Dictionary = {
+	2: {"density": 0.70, "contrast": 0.68, "clear_area": 0.55, "cluster_scale": 0.006},
+	4: {"density": 0.85, "contrast": 0.72, "clear_area": 0.45, "cluster_scale": 0.005},
+	6: {"density": 0.65, "contrast": 0.55, "clear_area": 0.60, "cluster_scale": 0.004},
+	7: {"density": 0.85, "contrast": 0.72, "clear_area": 0.35, "cluster_scale": 0.008},
+}
 var water_repetition_correction_enabled: bool = true
 var water_repetition_correction_strength: float = 1.0
 var cliff_repetition_correction_enabled: bool = true
@@ -107,11 +122,21 @@ var water_ripple_drift_speed: float = 0.55
 var water_glint_density: float = 0.14
 var water_glint_brightness: float = 0.38
 var procedural_cliff_materials_enabled: bool = true
+var cliff_shader_lod_enabled: bool = true
+var cliff_shader_lod_min_zoom: float = 0.125
+var cliff_shader_lod_full_detail_zoom: float = 1.0
+var cliff_shader_lod_min_detail: float = 0.20
+var cliff_shader_lod_detail: float = 1.0
+var cliff_shader_lod_zoom: float = 1.0
 var organic_cliff_geometry_enabled: bool = false
 var unified_cliff_components_enabled: bool = false
 var refined_cliff_silhouettes_enabled: bool = false
 var connected_cliff_contours_enabled: bool = false
 var unified_cliff_contours_enabled: bool = false
+var grid_aligned_cliff_rim_enabled: bool = false
+var cliff_rendering_mode: int = CliffRenderingMode.LEGACY
+var legacy_cliff_coverage_repair_enabled: bool = true
+var legacy_cliff_sidewall_occlusion_repair_enabled: bool = true
 var directional_cliff_projection_enabled: bool = false
 var cliff_height_profile: int = CliffHeightProfile.BASELINE
 var cliff_edge_overlays_visible: bool = true
@@ -1197,6 +1222,27 @@ func _apply_remaining_terrain_detail_parameters() -> void:
 				visual_material_by_id[terrain_id], config, definition)
 
 
+func set_terrain_noise_refinement_enabled(enabled: bool) -> void:
+	## Presentation-only G7 A/B switch. Shared shader materials update in place;
+	## authoritative terrain data and streamed chunk resources remain untouched.
+	terrain_noise_refinement_enabled = enabled
+	_apply_terrain_noise_refinement_parameters()
+
+
+func set_terrain_noise_refinement_material_settings(settings: Dictionary) -> void:
+	terrain_noise_refinement_material_settings = settings.duplicate(true)
+	_apply_terrain_noise_refinement_parameters()
+
+
+func _apply_terrain_noise_refinement_parameters() -> void:
+	var config: Dictionary = _terrain_surface_factory_config()["terrain_noise_refinement"]
+	for definition in Catalog.MATERIALS:
+		var terrain_id: int = int(definition["id"])
+		if visual_material_by_id.has(terrain_id):
+			TerrainSurfaceFactory.apply_terrain_noise_refinement_parameters(
+				visual_material_by_id[terrain_id], config, definition)
+
+
 func set_water_repetition_correction_enabled(enabled: bool) -> void:
 	water_repetition_correction_enabled = enabled
 	_apply_water_repetition_correction_parameters()
@@ -1269,6 +1315,78 @@ func set_procedural_cliff_materials_enabled(enabled: bool) -> void:
 		material.set_shader_parameter("procedural_enabled", enabled)
 	if organic_cliff_material != null:
 		organic_cliff_material.set_shader_parameter("procedural_enabled", enabled)
+
+
+func set_cliff_shader_lod_enabled(enabled: bool) -> void:
+	## Presentation-only rollback. Disabled always restores the pre-L2 shader
+	## value without rebuilding or replacing any shared material.
+	cliff_shader_lod_enabled = enabled
+	set_cliff_shader_lod_zoom(cliff_shader_lod_zoom)
+
+
+func set_cliff_shader_lod_zoom(zoom_value: float) -> void:
+	cliff_shader_lod_zoom = zoom_value
+	var detail: float = 1.0
+	if cliff_shader_lod_enabled:
+		detail = calculate_cliff_shader_lod_detail(
+			zoom_value, cliff_shader_lod_min_zoom,
+			cliff_shader_lod_full_detail_zoom, cliff_shader_lod_min_detail)
+	cliff_shader_lod_detail = detail
+	_apply_cliff_shader_lod_detail(detail)
+
+
+static func calculate_cliff_shader_lod_detail(
+		zoom_value: float, minimum_zoom: float,
+		full_detail_zoom: float, minimum_detail: float) -> float:
+	var far_zoom: float = maxf(minimum_zoom, 0.001)
+	var near_zoom: float = maxf(full_detail_zoom, far_zoom + 0.001)
+	var normalized: float = clampf((zoom_value - far_zoom) / (near_zoom - far_zoom), 0.0, 1.0)
+	var eased: float = normalized * normalized * (3.0 - 2.0 * normalized)
+	return lerpf(clampf(minimum_detail, 0.0, 1.0), 1.0, eased)
+
+
+func _apply_cliff_shader_lod_detail(detail: float) -> void:
+	## These are shared resources, so one parameter update covers existing and
+	## future streamed chunks in every mode that uses the procedural shader.
+	for material in cliff_material_by_source.values():
+		material.set_shader_parameter("detail_level", detail)
+	for material in cliff_shadow_material_by_source.values():
+		material.set_shader_parameter("detail_level", detail)
+	if organic_cliff_material != null:
+		organic_cliff_material.set_shader_parameter("detail_level", detail)
+
+
+func get_cliff_shader_lod_diagnostics() -> Dictionary:
+	## Read-only L2 verification. TerrainRenderer owns the shared materials, so
+	## gameplay UI can inspect their effective value without taking ownership.
+	var calculated: float = calculate_cliff_shader_lod_detail(
+		cliff_shader_lod_zoom, cliff_shader_lod_min_zoom,
+		cliff_shader_lod_full_detail_zoom, cliff_shader_lod_min_detail)
+	var actual_values: Array[float] = []
+	for material in cliff_material_by_source.values():
+		actual_values.append(float(material.get_shader_parameter("detail_level")))
+	for material in cliff_shadow_material_by_source.values():
+		actual_values.append(float(material.get_shader_parameter("detail_level")))
+	if organic_cliff_material != null:
+		actual_values.append(float(
+			organic_cliff_material.get_shader_parameter("detail_level")))
+	var actual: float = cliff_shader_lod_detail
+	var all_match := not actual_values.is_empty()
+	if not actual_values.is_empty():
+		actual = actual_values[0]
+		for value in actual_values:
+			if not is_equal_approx(value, actual):
+				all_match = false
+				break
+	return {
+		"enabled": cliff_shader_lod_enabled,
+		"zoom": cliff_shader_lod_zoom,
+		"calculated_detail": calculated,
+		"applied_detail": cliff_shader_lod_detail,
+		"actual_material_detail": actual,
+		"material_count": actual_values.size(),
+		"all_materials_match": all_match,
+	}
 
 
 func set_cliff_repetition_correction_enabled(enabled: bool) -> void:
@@ -1362,6 +1480,65 @@ func set_unified_cliff_contours_enabled(enabled: bool) -> void:
 		for chunk_coord in loaded_chunks:
 			_schedule_organic_cliff_rebuild(chunk_coord, true)
 	_restart_pending_stream_builds()
+
+
+func set_grid_aligned_cliff_rim_enabled(enabled: bool) -> void:
+	## C4F is presentation-only. Disabled restores the prior C4E.1 builder.
+	if grid_aligned_cliff_rim_enabled == enabled:
+		return
+	grid_aligned_cliff_rim_enabled = enabled
+	for chunk in loaded_chunks.values():
+		chunk.set_grid_aligned_cliff_rim_enabled(enabled)
+	if organic_cliff_geometry_enabled:
+		for chunk_coord in loaded_chunks:
+			_schedule_organic_cliff_rebuild(chunk_coord, true)
+	_restart_pending_stream_builds()
+
+
+func set_cliff_rendering_mode(mode: int) -> void:
+	## C4G selector. LEGACY delegates to the existing Boolean configuration
+	## unchanged; the other values select reversible presentation-only branches.
+	var value: int = clampi(mode, CliffRenderingMode.LEGACY, CliffRenderingMode.STYLISED)
+	if cliff_rendering_mode == value:
+		return
+	cliff_rendering_mode = value
+	for chunk in loaded_chunks.values():
+		chunk.set_experimental_cliff_mode(value)
+	if organic_cliff_geometry_enabled:
+		for chunk_coord in loaded_chunks:
+			_schedule_organic_cliff_rebuild(chunk_coord, true)
+	_restart_pending_stream_builds()
+	cliff_rendering_mode_changed.emit(value)
+
+
+func set_legacy_cliff_coverage_repair_enabled(enabled: bool) -> void:
+	## C4I is presentation-only and intentionally limited to LEGACY generation.
+	if legacy_cliff_coverage_repair_enabled == enabled:
+		return
+	legacy_cliff_coverage_repair_enabled = enabled
+	for chunk in loaded_chunks.values():
+		chunk.set_legacy_cliff_coverage_repair_enabled(enabled)
+	if organic_cliff_geometry_enabled:
+		for chunk_coord in loaded_chunks:
+			_schedule_organic_cliff_rebuild(chunk_coord, true)
+	_restart_pending_stream_builds()
+
+
+func set_legacy_cliff_sidewall_occlusion_repair_enabled(enabled: bool) -> void:
+	## C4K is presentation-only and limited to LEGACY lateral-return geometry.
+	if legacy_cliff_sidewall_occlusion_repair_enabled == enabled:
+		return
+	legacy_cliff_sidewall_occlusion_repair_enabled = enabled
+	for chunk in loaded_chunks.values():
+		chunk.set_legacy_cliff_sidewall_occlusion_repair_enabled(enabled)
+	if organic_cliff_geometry_enabled:
+		for chunk_coord in loaded_chunks:
+			_schedule_organic_cliff_rebuild(chunk_coord, true)
+	_restart_pending_stream_builds()
+
+
+func get_cliff_rendering_mode() -> int:
+	return cliff_rendering_mode
 
 
 func set_directional_cliff_projection_enabled(enabled: bool) -> void:
@@ -1602,7 +1779,10 @@ func _begin_job_population(job) -> void:
 		unified_cliff_contours_enabled,
 		world_seed,
 		organic_cliff_material, job.max_elevation_present, get_cliff_height_step(),
-		directional_cliff_projection_enabled)
+		directional_cliff_projection_enabled, grid_aligned_cliff_rim_enabled,
+		cliff_rendering_mode, legacy_cliff_coverage_repair_enabled,
+		legacy_cliff_sidewall_occlusion_repair_enabled)
+	chunk.set_experimental_cliff_mode(cliff_rendering_mode)
 	chunk.set_cliff_edge_overlays_visible(cliff_edge_overlays_visible)
 	chunk.set_cliff_shadows_visible(cliff_shadows_visible)
 	job.layer_creation_usec = Time.get_ticks_usec() - phase_start
@@ -1698,7 +1878,11 @@ func _create_build_job(chunk_coord: Vector2i):
 		connected_cliff_contours_enabled,
 		unified_cliff_contours_enabled,
 		int(_organic_geometry_revisions.get(chunk_coord, 0)), profiling_enabled,
-		get_cliff_height_step(), directional_cliff_projection_enabled)
+		get_cliff_height_step(), directional_cliff_projection_enabled,
+		legacy_cliff_coverage_repair_enabled,
+		legacy_cliff_sidewall_occlusion_repair_enabled)
+	job.set_grid_aligned_cliff_rim_enabled(grid_aligned_cliff_rim_enabled)
+	job.set_experimental_cliff_mode(cliff_rendering_mode)
 	return job
 
 
@@ -1722,7 +1906,11 @@ func _schedule_organic_cliff_rebuild(
 		connected_cliff_contours_enabled,
 		unified_cliff_contours_enabled,
 		revision, profiling_enabled, get_cliff_height_step(),
-		directional_cliff_projection_enabled)
+		directional_cliff_projection_enabled,
+		legacy_cliff_coverage_repair_enabled,
+		legacy_cliff_sidewall_occlusion_repair_enabled)
+	job.set_grid_aligned_cliff_rim_enabled(grid_aligned_cliff_rim_enabled)
+	job.set_experimental_cliff_mode(cliff_rendering_mode)
 	if reuse_cached_halo and _organic_halo_cache.has(chunk_coord):
 		var cached: Dictionary = _organic_halo_cache[chunk_coord]
 		if int(cached.revision) == int(_organic_terrain_revisions.get(chunk_coord, 0)):
@@ -1976,6 +2164,10 @@ func _terrain_surface_factory_config() -> Dictionary:
 			"enabled": remaining_terrain_detail_enabled,
 			"material_overrides": remaining_terrain_detail_material_settings,
 		},
+		"terrain_noise_refinement": {
+			"enabled": terrain_noise_refinement_enabled,
+			"material_overrides": terrain_noise_refinement_material_settings,
+		},
 		"organic_boundaries_enabled": organic_boundaries_enabled,
 		"organic_edge_strength": organic_edge_strength,
 		"organic_edge_frequency": organic_edge_frequency,
@@ -2012,6 +2204,8 @@ func _build_shared_cliff_tileset() -> void:
 	cliff_shadow_material_by_source = resources["shadow_materials"]
 	organic_cliff_material = resources["organic_material"]
 	_apply_cliff_repetition_correction_parameters()
+	_apply_cliff_shader_lod_detail(
+		cliff_shader_lod_detail if cliff_shader_lod_enabled else 1.0)
 
 
 func _build_shared_cliff_edge_tileset() -> void:

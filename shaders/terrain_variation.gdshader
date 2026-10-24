@@ -66,6 +66,13 @@ uniform float remaining_terrain_detail_strength : hint_range(0.0, 1.0) = 1.0;
 uniform float remaining_detail_style = 0.0;
 uniform vec3 remaining_base_color : source_color = vec3(1.0);
 uniform vec3 remaining_detail_color : source_color = vec3(0.5);
+// G7 refines only the distribution and contrast of existing G5/G6 marks.
+// Disabling it leaves those branches on their exact original calculations.
+uniform float terrain_noise_refinement_enabled : hint_range(0.0, 1.0) = 0.0;
+uniform float terrain_detail_density_scale : hint_range(0.0, 1.0) = 1.0;
+uniform float terrain_detail_contrast : hint_range(0.0, 1.0) = 1.0;
+uniform float terrain_clear_area_coverage : hint_range(0.0, 1.0) = 0.0;
+uniform float terrain_detail_cluster_scale = 0.006;
 // Liquid parameters are inert for ordinary terrain. They keep liquid styling
 // data-driven and leave authoritative material/height ownership in scripts.
 uniform float liquid_enabled : hint_range(0.0, 1.0) = 0.0;
@@ -200,28 +207,43 @@ void fragment() {
 			+ detail_seed * 0.053 + vec2(stochastic_detail_style * 31.0, -17.0));
 		float link_roll = stochastic_hash_value(detail_pixel + detail_seed * 0.097
 			+ vec2(-53.0, 79.0));
-		float detail_mask = step(1.0 - stochastic_detail_density, pixel_roll);
+		float refined_density = stochastic_detail_density;
+		float refined_contrast = 1.0;
+		float dense_region = 1.0;
+		if (terrain_noise_refinement_enabled > 0.5) {
+			float cluster_field = smooth_value_noise(
+				world_pixel * terrain_detail_cluster_scale + detail_seed * 0.037
+				+ vec2(stochastic_detail_style * 17.0, -29.0));
+			float cluster_rank = smoothstep(0.0, 1.0, cluster_field);
+			dense_region = smoothstep(
+				terrain_clear_area_coverage - 0.08,
+				terrain_clear_area_coverage + 0.08, cluster_rank);
+			refined_density *= terrain_detail_density_scale
+				* mix(0.10, 1.0, dense_region);
+			refined_contrast = terrain_detail_contrast;
+		}
+		float detail_mask = step(1.0 - refined_density, pixel_roll);
 		if (stochastic_detail_style > 1.5 && stochastic_detail_style < 2.5) {
 			// Dirt gains occasional two-pixel grains in either axis.
 			detail_mask = max(detail_mask,
-				step(1.0 - stochastic_detail_density * 0.55, left_roll)
+				step(1.0 - refined_density * 0.55, left_roll)
 				* step(0.46, link_roll));
 			detail_mask = max(detail_mask,
-				step(1.0 - stochastic_detail_density * 0.40, upper_roll)
+				step(1.0 - refined_density * 0.40, upper_roll)
 				* step(0.63, link_roll));
 		} else if (stochastic_detail_style > 2.5
 				&& stochastic_detail_style < 3.5) {
 			// Stone keeps sparse horizontal mineral flecks without fixed rows.
 			detail_mask = max(detail_mask,
-				step(1.0 - stochastic_detail_density * 0.80, left_roll)
+				step(1.0 - refined_density * 0.80, left_roll)
 				* step(0.32, link_roll));
 			detail_mask = max(detail_mask,
-				step(1.0 - stochastic_detail_density * 0.40, left_two_roll)
+				step(1.0 - refined_density * 0.40, left_two_roll)
 				* step(0.71, link_roll));
 		} else if (stochastic_detail_style > 3.5) {
 			// Mud uses fewer, softer paired pores than dirt.
 			detail_mask = max(detail_mask,
-				step(1.0 - stochastic_detail_density * 0.35, left_roll)
+				step(1.0 - refined_density * 0.35, left_roll)
 				* step(0.58, link_roll));
 		}
 		float broad_grain = smooth_value_noise(
@@ -234,9 +256,17 @@ void fragment() {
 		vec3 procedural_base = clamp(
 			stochastic_base_color * (1.0 + palette_shift) + variant_delta,
 			vec3(0.0), vec3(1.0));
-		vec3 procedural_surface = mix(
+		if (terrain_noise_refinement_enabled > 0.5
+				&& stochastic_detail_style > 3.5) {
+			// Mud carries a restrained broad darkening inside its irregular wet
+			// patches, while isolated pore pixels remain uncommon.
+			procedural_base *= 1.0 - dense_region * 0.035 * refined_contrast;
+		}
+		vec3 refined_detail_color = mix(
 			procedural_base, stochastic_detail_color + variant_delta,
-			detail_mask);
+			refined_contrast);
+		vec3 procedural_surface = mix(
+			procedural_base, refined_detail_color, detail_mask);
 		surface_rgb = mix(surface_rgb, procedural_surface,
 			stochastic_terrain_detail_intensity);
 	}
@@ -270,14 +300,41 @@ void fragment() {
 			float left_two = stochastic_hash_value(detail_pixel - vec2(2.0, 0.0) + anchor_seed);
 			float above = stochastic_hash_value(detail_pixel - vec2(0.0, 1.0) + anchor_seed);
 			float diagonal = stochastic_hash_value(detail_pixel - vec2(1.0, 1.0) + anchor_seed);
-			float fragment = step(0.947, here);
-			fragment = max(fragment, step(0.965, left)
-				* step(0.48, stochastic_hash_value(detail_pixel + anchor_seed + vec2(19.0, 41.0))));
-			fragment = max(fragment, step(0.982, left_two)
-				* step(0.70, stochastic_hash_value(detail_pixel + anchor_seed + vec2(-61.0, 23.0))));
-			fragment = max(fragment, step(0.972, above)
-				* step(0.58, stochastic_hash_value(detail_pixel + anchor_seed + vec2(47.0, -29.0))));
-			fragment = max(fragment, step(0.986, diagonal));
+			float gravel_density_scale = 1.0;
+			float gravel_contrast = 1.0;
+			if (terrain_noise_refinement_enabled > 0.5) {
+				float gravel_cluster = smooth_value_noise(
+					world_pixel * terrain_detail_cluster_scale + detail_seed * 0.037
+					+ vec2(113.0, -47.0));
+				float gravel_rank = smoothstep(0.0, 1.0, gravel_cluster);
+				float gravel_region = smoothstep(
+					terrain_clear_area_coverage - 0.08,
+					terrain_clear_area_coverage + 0.08, gravel_rank);
+				gravel_density_scale = terrain_detail_density_scale
+					* mix(0.25, 1.0, gravel_region);
+				gravel_contrast = terrain_detail_contrast;
+			}
+			float fragment;
+			if (terrain_noise_refinement_enabled > 0.5) {
+				fragment = step(1.0 - 0.053 * gravel_density_scale, here);
+				fragment = max(fragment, step(1.0 - 0.035 * gravel_density_scale, left)
+					* step(0.48, stochastic_hash_value(detail_pixel + anchor_seed + vec2(19.0, 41.0))));
+				fragment = max(fragment, step(1.0 - 0.018 * gravel_density_scale, left_two)
+					* step(0.70, stochastic_hash_value(detail_pixel + anchor_seed + vec2(-61.0, 23.0))));
+				fragment = max(fragment, step(1.0 - 0.028 * gravel_density_scale, above)
+					* step(0.58, stochastic_hash_value(detail_pixel + anchor_seed + vec2(47.0, -29.0))));
+				fragment = max(fragment, step(1.0 - 0.014 * gravel_density_scale, diagonal));
+			} else {
+				// Keep the original G6 constants and operations for exact rollback.
+				fragment = step(0.947, here);
+				fragment = max(fragment, step(0.965, left)
+					* step(0.48, stochastic_hash_value(detail_pixel + anchor_seed + vec2(19.0, 41.0))));
+				fragment = max(fragment, step(0.982, left_two)
+					* step(0.70, stochastic_hash_value(detail_pixel + anchor_seed + vec2(-61.0, 23.0))));
+				fragment = max(fragment, step(0.972, above)
+					* step(0.58, stochastic_hash_value(detail_pixel + anchor_seed + vec2(47.0, -29.0))));
+				fragment = max(fragment, step(0.986, diagonal));
+			}
 			float gravel_shift = broad * 0.075 + fine * 0.025;
 			vec3 gravel_base = clamp(
 				remaining_base_color * (1.0 + gravel_shift) + variant_delta,
@@ -287,6 +344,7 @@ void fragment() {
 			vec3 fragment_color = mix(
 				remaining_detail_color * 0.82,
 				remaining_detail_color * 1.24, fragment_tone) + variant_delta;
+			fragment_color = mix(gravel_base, fragment_color, gravel_contrast);
 			procedural_surface = mix(gravel_base, fragment_color, fragment);
 		}
 		surface_rgb = mix(surface_rgb, procedural_surface,

@@ -18,9 +18,29 @@ const REFINED_RETURN_STEP := 16
 ## face upward beneath the elevated surface closes that bounded projection gap
 ## without widening the contour or covering unrelated ground.
 const UNIFIED_CREST_UNDERLAP := 14
+## C4I measurements bound the continuous lateral opening to ten pixels after
+## the existing five-pixel return. Projected crest/foot joins retain the full
+## measured 14 px contour + mask + alpha disagreement envelope.
+const LEGACY_LATERAL_COVERAGE_MARGIN := 10
+## C4K promotes only the residual high-side lateral envelope above lower terrain.
+## The low side retains the accepted five-pixel return, preventing brown halos.
+const LEGACY_SIDEWALL_OCCLUSION_MARGIN := 10
+## Two additional pixels cover the bilinear/nearest viewport sampling fringe
+## observed at prominent-profile convex joins without changing the face mesh.
+const LEGACY_PROJECTED_COVERAGE_MARGIN := UNIFIED_CREST_UNDERLAP + 2
+const GRID_CORNER_RADIUS := 4
+const GRID_RIM_DEPTH := 3
+const GRID_SIDE_DEPTH := 6
 const HALO_MARGIN := 1
 const HALO_SIZE := CHUNK_SIZE + HALO_MARGIN * 2
 const HALO_CELL_COUNT := HALO_SIZE * HALO_SIZE
+
+enum ExperimentalCliffMode {
+	LEGACY,
+	GRID,
+	UNIFIED,
+	STYLISED,
+}
 
 
 static func build(
@@ -32,7 +52,11 @@ static func build(
 		connected_contours_enabled: bool = false,
 		unified_contours_enabled: bool = false,
 		height_step: int = BASELINE_HEIGHT_STEP,
-		directional_projection_enabled: bool = false) -> Dictionary:
+		directional_projection_enabled: bool = false,
+		grid_aligned_rim_enabled: bool = false,
+		experimental_mode: int = ExperimentalCliffMode.LEGACY,
+		legacy_coverage_repair_enabled: bool = false,
+		legacy_sidewall_occlusion_repair_enabled: bool = false) -> Dictionary:
 	var started_usec: int = Time.get_ticks_usec()
 	var sampling_started_usec: int = Time.get_ticks_usec()
 	# One bounded halo read replaces repeated height/material callbacks from the
@@ -54,7 +78,8 @@ static func build(
 		chunk_coord, max_elevation, world_seed, halo_ids, halo_heights,
 		liquid_by_id, unified_components_enabled, refined_silhouettes_enabled,
 		connected_contours_enabled, unified_contours_enabled, true, height_step,
-		directional_projection_enabled)
+		directional_projection_enabled, grid_aligned_rim_enabled, experimental_mode,
+		legacy_coverage_repair_enabled, legacy_sidewall_occlusion_repair_enabled)
 	process_incremental(state, CHUNK_SIZE * CHUNK_SIZE)
 	var result: Dictionary = finalize_incremental(state)
 	result.sampling_usec = sampling_usec
@@ -73,7 +98,11 @@ static func create_incremental(
 		unified_contours_enabled: bool = false,
 		profiling_enabled: bool = false,
 		height_step: int = BASELINE_HEIGHT_STEP,
-		directional_projection_enabled: bool = false) -> Dictionary:
+		directional_projection_enabled: bool = false,
+		grid_aligned_rim_enabled: bool = false,
+		experimental_mode: int = ExperimentalCliffMode.LEGACY,
+		legacy_coverage_repair_enabled: bool = false,
+		legacy_sidewall_occlusion_repair_enabled: bool = false) -> Dictionary:
 	## The caller owns the immutable 34x34 snapshot. All mutable state below is
 	## presentation-only and can be discarded safely when a chunk is invalidated.
 	return {
@@ -89,19 +118,33 @@ static func create_incremental(
 		"unified_contours_enabled": unified_contours_enabled,
 		"height_step": maxi(1, height_step),
 		"directional_projection_enabled": directional_projection_enabled,
+		"grid_aligned_rim_enabled": grid_aligned_rim_enabled,
+		"experimental_mode": clampi(
+			experimental_mode, ExperimentalCliffMode.LEGACY,
+			ExperimentalCliffMode.STYLISED),
+		"legacy_coverage_repair_enabled": legacy_coverage_repair_enabled,
+		"legacy_sidewall_occlusion_repair_enabled": legacy_sidewall_occlusion_repair_enabled,
 		"profiling_enabled": profiling_enabled,
 		"cell_index": 0,
 		"buffers": {},
+		"coverage_buffers": {},
+		"sidewall_occlusion_buffers": {},
 		"edge_buffers": {},
 		"shadow_buffers": {},
 		"face_count": 0,
 		"edge_component_count": 0,
 		"shadow_count": 0,
 		"triangle_count": 0,
+		"coverage_triangle_count": 0,
+		"sidewall_occlusion_triangle_count": 0,
 		"face_construction_usec": 0,
 		"contour_generation_usec": 0,
 		"vertex_assembly_usec": 0,
-		"profile_metrics": ({"vertex_assembly_usec": 0} if profiling_enabled else {}),
+		"profile_metrics": ({
+			"vertex_assembly_usec": 0,
+		} if profiling_enabled else {}),
+		"shared_surface_sources": PackedInt32Array(),
+		"shared_surface_heights": PackedByteArray(),
 	}
 
 
@@ -123,6 +166,12 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 	var started_usec: int = Time.get_ticks_usec() if profiling_enabled else 0
 	var local_x: int = cell_index % CHUNK_SIZE
 	var local_y: int = floori(float(cell_index) / CHUNK_SIZE)
+	if (bool(state.grid_aligned_rim_enabled)
+			or int(state.experimental_mode) != ExperimentalCliffMode.LEGACY):
+		_process_grid_aligned_cell(state, local_x, local_y)
+		if profiling_enabled:
+			state.face_construction_usec += Time.get_ticks_usec() - started_usec
+		return
 	if bool(state.unified_contours_enabled):
 		_process_unified_contour_square(state, local_x, local_y)
 		if profiling_enabled:
@@ -250,6 +299,189 @@ static func _process_cell(state: Dictionary, cell_index: int) -> void:
 		state.triangle_count += edge_result.y
 
 
+static func _process_grid_aligned_cell(
+		state: Dictionary, local_x: int, local_y: int) -> void:
+	## C4F prototype: authoritative cells remain untouched. Presentation traces
+	## their cardinal perimeter directly, then derives the rim and face from the
+	## same bounded, pixel-quantised segments.
+	var center_index: int = (
+		(local_y + HALO_MARGIN) * HALO_SIZE + local_x + HALO_MARGIN)
+	var owner_height: int = int(state.halo_heights[center_index])
+	if owner_height <= 0:
+		return
+	var terrain_id: int = int(state.halo_ids[center_index])
+	if bool(state.liquid_by_id.get(terrain_id, false)):
+		return
+	if int(state.experimental_mode) >= ExperimentalCliffMode.UNIFIED:
+		if state.shared_surface_sources.is_empty():
+			state.shared_surface_sources.resize(CHUNK_SIZE * CHUNK_SIZE)
+			state.shared_surface_sources.fill(-1)
+			state.shared_surface_heights.resize(CHUNK_SIZE * CHUNK_SIZE)
+		var cell_index: int = local_y * CHUNK_SIZE + local_x
+		state.shared_surface_sources[cell_index] = terrain_id
+		state.shared_surface_heights[cell_index] = mini(
+			owner_height, int(state.max_elevation))
+	var neighbour_indices := PackedInt32Array([
+		center_index - HALO_SIZE, center_index + 1,
+		center_index + HALO_SIZE, center_index - 1])
+	var world_cell: Vector2i = (
+		state.chunk_coord * CHUNK_SIZE + Vector2i(local_x, local_y))
+	for level in range(1, mini(owner_height, int(state.max_elevation)) + 1):
+		var exposed := PackedByteArray()
+		exposed.resize(4)
+		var shoreline: bool = false
+		for direction in range(4):
+			var neighbour_index: int = neighbour_indices[direction]
+			exposed[direction] = 1 if int(state.halo_heights[neighbour_index]) < level else 0
+			if exposed[direction] == 1 and bool(
+					state.liquid_by_id.get(int(state.halo_ids[neighbour_index]), false)):
+				shoreline = true
+		if exposed[0] + exposed[1] + exposed[2] + exposed[3] == 0:
+			continue
+		var source_id: int = _cliff_source_for(terrain_id, shoreline)
+		if not state.buffers.has(level):
+			state.buffers[level] = _new_buffer()
+		var segments: Array[PackedVector2Array] = _grid_boundary_segments(
+			local_x, local_y, level, int(state.height_step), exposed,
+			0 if int(state.experimental_mode) >= ExperimentalCliffMode.UNIFIED
+			else GRID_CORNER_RADIUS)
+		for segment in segments:
+			state.triangle_count += _append_grid_boundary_geometry(
+				state.buffers[level], segment, source_id, world_cell, level,
+				int(state.height_step), state.profile_metrics,
+				int(state.experimental_mode))
+			state.face_count += 1
+			state.edge_component_count += 1
+
+
+static func _grid_boundary_segments(
+		local_x: int, local_y: int, level: int, height_step: int,
+		exposed: PackedByteArray, corner_radius: int = GRID_CORNER_RADIUS
+		) -> Array[PackedVector2Array]:
+	## Direction order is north, east, south, west. Each segment is oriented so
+	## occupied terrain remains on its left; neighbouring cells therefore omit
+	## their shared edge instead of producing overlapping ownership.
+	var left: float = local_x * TILE_SIZE - TILE_SIZE * 0.5
+	var top: float = local_y * TILE_SIZE - TILE_SIZE * 0.5
+	var right: float = left + TILE_SIZE
+	var bottom: float = top + TILE_SIZE
+	var radius: float = float(corner_radius)
+	var shift := Vector2(0, -level * height_step)
+	var result: Array[PackedVector2Array] = []
+	if exposed[0] == 1:
+		result.append(PackedVector2Array([
+			Vector2(right - (radius if exposed[1] == 1 else 0.0), top) + shift,
+			Vector2(left + (radius if exposed[3] == 1 else 0.0), top) + shift]))
+	if exposed[3] == 1:
+		result.append(PackedVector2Array([
+			Vector2(left, top + (radius if exposed[0] == 1 else 0.0)) + shift,
+			Vector2(left, bottom - (radius if exposed[2] == 1 else 0.0)) + shift]))
+	if exposed[2] == 1:
+		result.append(PackedVector2Array([
+			Vector2(left + (radius if exposed[3] == 1 else 0.0), bottom) + shift,
+			Vector2(right - (radius if exposed[1] == 1 else 0.0), bottom) + shift]))
+	if exposed[1] == 1:
+		result.append(PackedVector2Array([
+			Vector2(right, bottom - (radius if exposed[2] == 1 else 0.0)) + shift,
+			Vector2(right, top + (radius if exposed[0] == 1 else 0.0)) + shift]))
+	# Bevels close only convex corners. Concave joins remain exact grid corners.
+	if radius > 0.0 and exposed[0] == 1 and exposed[3] == 1:
+		result.append(PackedVector2Array([
+			Vector2(left + radius, top) + shift, Vector2(left, top + radius) + shift]))
+	if radius > 0.0 and exposed[3] == 1 and exposed[2] == 1:
+		result.append(PackedVector2Array([
+			Vector2(left, bottom - radius) + shift, Vector2(left + radius, bottom) + shift]))
+	if radius > 0.0 and exposed[2] == 1 and exposed[1] == 1:
+		result.append(PackedVector2Array([
+			Vector2(right - radius, bottom) + shift, Vector2(right, bottom - radius) + shift]))
+	if radius > 0.0 and exposed[1] == 1 and exposed[0] == 1:
+		result.append(PackedVector2Array([
+			Vector2(right, top + radius) + shift, Vector2(right - radius, top) + shift]))
+	return result
+
+
+static func _append_grid_boundary_geometry(
+		buffer: Dictionary, segment: PackedVector2Array, source_id: int,
+		world_cell: Vector2i, level: int, height_step: int,
+		profile_metrics: Dictionary,
+		experimental_mode: int = ExperimentalCliffMode.LEGACY) -> int:
+	var first: Vector2 = segment[0]
+	var last: Vector2 = segment[1]
+	var delta: Vector2 = last - first
+	if delta.is_zero_approx():
+		return 0
+	# Segments are oriented with occupied terrain on their left, so the exposed
+	# low side is the right-hand normal. C4F's original sign extruded walls back
+	# into the plateau and the old masked surface happened to hide much of it.
+	var low_normal := Vector2(-delta.y, delta.x).normalized()
+	var south_exposure: float = maxf(0.0, low_normal.y)
+	var shared_boundary: bool = experimental_mode >= ExperimentalCliffMode.UNIFIED
+	var depth: float = lerpf(float(GRID_SIDE_DEPTH), float(height_step), south_exposure)
+	var face_offset: Vector2 = (
+		Vector2(0.0, float(height_step))
+		if shared_boundary else (low_normal * depth).round())
+	var rim_offset: Vector2 = (low_normal * GRID_RIM_DEPTH).round()
+	var seed: int = _hash_int(world_cell.x, world_cell.y, level, 0, 263)
+	if shared_boundary and south_exposure < 0.5:
+		# Strict top-down projection: every cardinal edge gets a continuous lip,
+		# but only the screen-facing south boundary owns a broad wall. Projecting
+		# east/west edges through a complete height step creates the long, thin
+		# slivers C4G is specifically intended to remove.
+		_append_quad(
+			buffer, first, last, last + rim_offset, first + rim_offset,
+			1.04 - 0.08 * south_exposure, source_id, seed & 1, 1, 1.0,
+			profile_metrics)
+		return 2
+	if experimental_mode == ExperimentalCliffMode.STYLISED:
+		return _append_stylised_grid_wall(
+			buffer, first, last, face_offset, source_id, seed, profile_metrics)
+	_append_quad(
+		buffer, first, last, last + face_offset, first + face_offset,
+		_directional_face_shade(delta), source_id, seed & 1, 0, 1.0,
+		profile_metrics)
+	_append_quad(
+		buffer, first, last, last + rim_offset, first + rim_offset,
+		1.04 - 0.08 * south_exposure, source_id, seed & 1, 1, 1.0,
+		profile_metrics)
+	return 4
+
+
+static func _append_stylised_grid_wall(
+		buffer: Dictionary, first: Vector2, last: Vector2, face_offset: Vector2,
+		source_id: int, seed: int, profile_metrics: Dictionary) -> int:
+	## C4G's comparison wall uses broad, quantised bands. It deliberately keeps
+	## all detail in the generated presentation mesh, so switching modes does not
+	## mutate the shared cliff material or any authoritative terrain data.
+	var offsets := PackedFloat32Array([0.0, 0.125, 0.38, 0.62, 0.84, 1.0])
+	var shades := PackedFloat32Array([1.10, 0.96, 0.86, 0.78, 0.66])
+	var roles := PackedInt32Array([1, 0, 0, 0, 3])
+	var triangle_count: int = 10
+	for band in range(shades.size()):
+		var near_offset: Vector2 = (face_offset * offsets[band]).round()
+		var far_offset: Vector2 = (face_offset * offsets[band + 1]).round()
+		_append_quad(
+			buffer, first + near_offset, last + near_offset,
+			last + far_offset, first + far_offset,
+			shades[band], source_id, (seed + band) & 1, roles[band], 1.0,
+			profile_metrics)
+	# A deterministic one-pixel seam breaks long walls without creating loose
+	# geometry or pointed ends. Convex bevel segments stay clean.
+	if first.distance_to(last) > 8.0 and posmod(seed, 3) == 0:
+		triangle_count += 2
+		var tangent: Vector2 = (last - first).normalized()
+		var seam_center: Vector2 = first.lerp(last, 0.5)
+		var seam_half: Vector2 = tangent * 0.5
+		var seam_start: Vector2 = (face_offset * 0.125).round()
+		var seam_end: Vector2 = (face_offset * 0.84).round()
+		_append_quad(
+			buffer, seam_center - seam_half + seam_start,
+			seam_center + seam_half + seam_start,
+			seam_center + seam_half + seam_end,
+			seam_center - seam_half + seam_end,
+			0.70, source_id, seed & 1, 2, 0.72, profile_metrics)
+	return triangle_count
+
+
 static func _process_unified_contour_square(
 		state: Dictionary, local_x: int, local_y: int) -> void:
 	## Phase 3E owns one four-sample render square. The same square supplies the
@@ -294,6 +526,14 @@ static func _process_unified_contour_square(
 		var render_elevation: int = max_height
 		if not state.buffers.has(render_elevation):
 			state.buffers[render_elevation] = _new_buffer()
+		if (bool(state.legacy_coverage_repair_enabled)
+				and int(state.experimental_mode) == ExperimentalCliffMode.LEGACY
+				and not state.coverage_buffers.has(render_elevation)):
+			state.coverage_buffers[render_elevation] = _new_buffer()
+		if (bool(state.legacy_sidewall_occlusion_repair_enabled)
+				and int(state.experimental_mode) == ExperimentalCliffMode.LEGACY
+				and not state.sidewall_occlusion_buffers.has(render_elevation)):
+			state.sidewall_occlusion_buffers[render_elevation] = _new_buffer()
 		for segment in segments:
 			var path: PackedVector2Array = _unified_contour_path(
 				segment, mask, local_x, local_y, world_cell, level,
@@ -306,6 +546,32 @@ static func _process_unified_contour_square(
 			state.triangle_count += (
 				state.buffers[render_elevation].indices.size() / 3 - triangles_before)
 			state.face_count += 1
+			if (bool(state.legacy_sidewall_occlusion_repair_enabled)
+					and int(state.experimental_mode) == ExperimentalCliffMode.LEGACY):
+				triangles_before = (
+					state.sidewall_occlusion_buffers[render_elevation].indices.size() / 3)
+				_append_legacy_sidewall_occluder(
+					state.sidewall_occlusion_buffers[render_elevation], path, source_id,
+					world_cell, level, state.profile_metrics,
+					bool(state.directional_projection_enabled))
+				var added_occlusion_triangles: int = (
+					state.sidewall_occlusion_buffers[render_elevation].indices.size() / 3
+					- triangles_before)
+				state.sidewall_occlusion_triangle_count += added_occlusion_triangles
+				state.triangle_count += added_occlusion_triangles
+			if (bool(state.legacy_coverage_repair_enabled)
+					and int(state.experimental_mode) == ExperimentalCliffMode.LEGACY):
+				triangles_before = (
+					state.coverage_buffers[render_elevation].indices.size() / 3)
+				_append_legacy_coverage_skirt(
+					state.coverage_buffers[render_elevation], path, source_id,
+					world_cell, level, int(state.height_step), state.profile_metrics,
+					bool(state.directional_projection_enabled))
+				var added_coverage_triangles: int = (
+					state.coverage_buffers[render_elevation].indices.size() / 3
+					- triangles_before)
+				state.coverage_triangle_count += added_coverage_triangles
+				state.triangle_count += added_coverage_triangles
 			if bool(state.unified_components_enabled):
 				# The Phase 3B face shader already supplies the crest read. A second
 				# strip per marching segment both duplicated that silhouette and was
@@ -478,6 +744,112 @@ static func _append_unified_contour_band(
 		directional)
 
 
+static func _append_legacy_coverage_skirt(
+		buffer: Dictionary, path: PackedVector2Array, source_id: int,
+		world_cell: Vector2i, level: int, height_step: int,
+		profile_metrics: Dictionary, directional: bool) -> void:
+	## Coverage remains a separate, presentation-only mesh below every terrain
+	## surface. The primary face still owns the visible contour. C4J collapses
+	## C4I's overlapping crest, foot, and endpoint primitives into one bounded
+	## quad per path. This retains their combined envelope without duplicating
+	## internal geometry.
+	var path_delta: Vector2 = path[path.size() - 1] - path[0]
+	var side_return_path: bool = (
+		absf(path_delta.y) > absf(path_delta.x)
+		and absf(path_delta.x) <= 5.0)
+	var shade: float = (
+		_directional_face_shade(path_delta) if directional else 0.96)
+	var diagonal_seed: int = _hash_int(
+		world_cell.x, world_cell.y, level, 0, 263)
+	if side_return_path:
+		var side_return := Vector2(signf(path_delta.y) * 5.0, 0.0)
+		var first_center: Vector2 = path[0] + Vector2(0, -2) + side_return * 0.5
+		var last_center: Vector2 = (
+			path[path.size() - 1] + Vector2(0, -2) + side_return * 0.5)
+		_append_coverage_segment_extents(
+			buffer, first_center, last_center,
+			LEGACY_PROJECTED_COVERAGE_MARGIN + 2.5,
+			LEGACY_LATERAL_COVERAGE_MARGIN + 2.5, shade, source_id,
+			diagonal_seed & 1, profile_metrics)
+		return
+	_append_coverage_path_bounds(
+		buffer, path, -2.0, float(height_step + 1),
+		LEGACY_PROJECTED_COVERAGE_MARGIN, shade, source_id,
+		diagonal_seed & 1, profile_metrics)
+
+
+static func _append_legacy_sidewall_occluder(
+		buffer: Dictionary, path: PackedVector2Array, source_id: int,
+		world_cell: Vector2i, level: int, profile_metrics: Dictionary,
+		directional: bool) -> void:
+	## C4K is intentionally limited to near-vertical lateral returns. The accepted
+	## main face already extends five pixels toward the low side. This companion
+	## strip extends only toward the high side, where the independently displaced
+	## upper/lower alpha masks can otherwise reveal lower terrain. Its render layer
+	## sits above lower surfaces but below the accepted face and owning top.
+	var path_delta: Vector2 = path[path.size() - 1] - path[0]
+	if (absf(path_delta.y) <= absf(path_delta.x)
+			or absf(path_delta.x) > 5.0):
+		return
+	var low_side := Vector2(signf(path_delta.y), 0.0)
+	var high_extension: Vector2 = -low_side * LEGACY_SIDEWALL_OCCLUSION_MARGIN
+	var low_extension: Vector2 = low_side * 5.0
+	var crest_offset := Vector2(0.0, -2.0)
+	var first: Vector2 = path[0] + crest_offset
+	var last: Vector2 = path[path.size() - 1] + crest_offset
+	var shade: float = (
+		_directional_face_shade(path_delta) if directional else 0.96)
+	_append_quad(
+		buffer, first + high_extension, last + high_extension,
+		last + low_extension, first + low_extension,
+		shade, source_id,
+		_hash_int(world_cell.x, world_cell.y, level, 0, 269) & 1,
+		0, 1.0, profile_metrics)
+
+
+static func _append_coverage_segment_extents(
+		buffer: Dictionary, first: Vector2, last: Vector2,
+		tangent_extent: float, normal_extent: float,
+		shade: float, source_id: int, diagonal: int,
+		profile_metrics: Dictionary) -> void:
+	var delta: Vector2 = last - first
+	if delta.length_squared() < 1.0:
+		return
+	var tangent: Vector2 = delta.normalized() * tangent_extent
+	var normal := Vector2(-delta.y, delta.x).normalized() * normal_extent
+	_append_quad(
+		buffer, first - tangent - normal, last + tangent - normal,
+		last + tangent + normal, first - tangent + normal,
+		shade, source_id, diagonal, 0, 1.0, profile_metrics)
+
+
+static func _append_coverage_path_bounds(
+		buffer: Dictionary, path: PackedVector2Array, upper_y: float,
+		lower_y: float, margin: float, shade: float,
+		source_id: int, diagonal: int, profile_metrics: Dictionary) -> void:
+	var minimum_x: float = INF
+	var maximum_x: float = -INF
+	var minimum_y: float = INF
+	var maximum_y: float = -INF
+	for point in path:
+		minimum_x = minf(minimum_x, point.x)
+		maximum_x = maxf(maximum_x, point.x)
+		minimum_y = minf(minimum_y, point.y + upper_y)
+		maximum_y = maxf(maximum_y, point.y + lower_y)
+	# A segment-local square can project by sqrt(2) times its radius onto the
+	# screen axes. Expanding by that amount conservatively contains every
+	# C4I crest and foot strip, including the organic midpoint displacement.
+	var projected_margin: float = margin * sqrt(2.0)
+	minimum_x -= projected_margin
+	maximum_x += projected_margin
+	minimum_y -= projected_margin
+	maximum_y += projected_margin
+	_append_quad(
+		buffer, Vector2(minimum_x, minimum_y), Vector2(maximum_x, minimum_y),
+		Vector2(maximum_x, maximum_y), Vector2(minimum_x, maximum_y),
+		shade, source_id, diagonal, 0, 1.0, profile_metrics)
+
+
 static func _directional_face_shade(delta: Vector2) -> float:
 	## High terrain is on the left. Camera elevation projects toward screen -Y;
 	## the low-side normal's +Y component measures front-facing exposure.
@@ -506,6 +878,33 @@ static func _append_unified_offset_strip(
 	## shared crest endpoint the same foot endpoint. The bounded upward underlap
 	## remains behind the upper surface, while lateral_depth gives vertical side
 	## returns real area instead of the previous unsigned one-pixel sliver.
+	var path_delta: Vector2 = path[path.size() - 1] - path[0]
+	var side_return_path: bool = (
+		component_role == 0
+		and lateral_depth > 0
+		and absf(path_delta.y) > absf(path_delta.x)
+		and absf(path_delta.x) <= float(lateral_depth))
+	var side_return := Vector2(
+		signf(path_delta.y) * lateral_depth, 0.0) if side_return_path else Vector2.ZERO
+	var visible_crest_y: int = upper_y + UNIFIED_CREST_UNDERLAP
+	if side_return_path:
+		# The middle point exists to keep a vertically projected face from
+		# degenerating, but retaining it in a lateral strip creates two opposing
+		# pointed fragments. Canonical endpoints already carry the organic drift
+		# and are shared across squares/chunks, so one strip is both continuous
+		# and free of an artificial internal tip.
+		var first: Vector2 = path[0]
+		var last: Vector2 = path[path.size() - 1]
+		_append_quad(
+			buffer,
+			first + Vector2(0, visible_crest_y),
+			last + Vector2(0, visible_crest_y),
+			last + Vector2(0, visible_crest_y) + side_return,
+			first + Vector2(0, visible_crest_y) + side_return,
+			_directional_face_shade(path_delta) if directional else shade,
+			source_id, diagonal_seed & 1,
+			component_role, alpha, profile_metrics)
+		return
 	for segment in range(path.size() - 1):
 		var first: Vector2 = path[segment]
 		var last: Vector2 = path[segment + 1]
@@ -526,20 +925,38 @@ static func finalize_incremental(state: Dictionary) -> Dictionary:
 	assert(is_incremental_ready(state), "Cannot finalize an incomplete cliff geometry job")
 	var mesh_started_usec: int = Time.get_ticks_usec()
 	var face_result: Dictionary = _buffers_to_meshes(state.buffers, int(state.max_elevation))
+	var coverage_result: Dictionary = _buffers_to_meshes(
+		state.coverage_buffers, int(state.max_elevation))
+	var sidewall_occlusion_result: Dictionary = _buffers_to_meshes(
+		state.sidewall_occlusion_buffers, int(state.max_elevation))
 	var edge_result: Dictionary = _buffers_to_meshes(state.edge_buffers, int(state.max_elevation))
 	var shadow_result: Dictionary = _buffers_to_meshes(state.shadow_buffers, int(state.max_elevation))
 	var mesh_resource_usec: int = Time.get_ticks_usec() - mesh_started_usec
-	var vertex_count: int = int(face_result.vertex_count) + int(edge_result.vertex_count) + int(shadow_result.vertex_count)
+	var vertex_count: int = (int(face_result.vertex_count)
+		+ int(coverage_result.vertex_count)
+		+ int(sidewall_occlusion_result.vertex_count) + int(edge_result.vertex_count)
+		+ int(shadow_result.vertex_count))
 	return {
 		"meshes": face_result.meshes,
+		"coverage_meshes": coverage_result.meshes,
+		"sidewall_occlusion_meshes": sidewall_occlusion_result.meshes,
 		"edge_meshes": edge_result.meshes,
 		"shadow_meshes": shadow_result.meshes,
 		"face_count": int(state.face_count),
 		"edge_component_count": int(state.edge_component_count),
 		"shadow_count": int(state.shadow_count),
-		"surface_count": int(face_result.surface_count) + int(edge_result.surface_count) + int(shadow_result.surface_count),
+		"surface_count": (int(face_result.surface_count)
+			+ int(coverage_result.surface_count)
+			+ int(sidewall_occlusion_result.surface_count) + int(edge_result.surface_count)
+			+ int(shadow_result.surface_count)),
 		"vertex_count": vertex_count,
 		"triangle_count": int(state.triangle_count),
+		"coverage_vertex_count": int(coverage_result.vertex_count),
+		"coverage_triangle_count": int(state.coverage_triangle_count),
+		"coverage_surface_count": int(coverage_result.surface_count),
+		"sidewall_occlusion_vertex_count": int(sidewall_occlusion_result.vertex_count),
+		"sidewall_occlusion_triangle_count": int(state.sidewall_occlusion_triangle_count),
+		"sidewall_occlusion_surface_count": int(sidewall_occlusion_result.surface_count),
 		"height_query_count": 0,
 		"material_query_count": 0,
 		"sampling_usec": 0,
@@ -550,6 +967,8 @@ static func finalize_incremental(state: Dictionary) -> Dictionary:
 		# total CPU work.
 		"vertex_assembly_usec": int(state.profile_metrics.get("vertex_assembly_usec", 0)),
 		"mesh_resource_usec": mesh_resource_usec,
+		"shared_surface_sources": state.shared_surface_sources,
+		"shared_surface_heights": state.shared_surface_heights,
 		"build_usec": int(state.face_construction_usec) + int(state.contour_generation_usec)
 			+ int(state.profile_metrics.get("vertex_assembly_usec", 0)) + mesh_resource_usec,
 	}

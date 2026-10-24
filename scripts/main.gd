@@ -1,5 +1,5 @@
 extends Node2D
-## Owns demo input, camera navigation, painting requests, and the screen-space HUD.
+## Coordinates demo input, camera navigation, painting requests, and the screen-space HUD.
 ## TerrainRenderer streams visuals; its TerrainWorld remains gameplay authority.
 
 const Catalog = preload("res://scripts/terrain_catalog.gd")
@@ -8,12 +8,9 @@ const CursorOverlay = preload("res://scripts/cursor_overlay.gd")
 const WorldEditorController = preload("res://scripts/world_editor_controller.gd")
 const ResourceInteractionController = preload("res://scripts/resource_interaction_controller.gd")
 const WorldSaveService = preload("res://scripts/world_save_service.gd")
-
-const CAMERA_PAN_SPEED: float = 700.0
-const CAMERA_MIN_ZOOM: float = 0.001
-const CAMERA_MAX_ZOOM: float = 166.0
-const CAMERA_ZOOM_FACTOR: float = 1.15
-const DEMO_CENTER: Vector2 = Vector2(16.0, 16.0)
+const CameraController = preload("res://scripts/camera_controller.gd")
+const TerrainRendererConfiguration = preload(
+	"res://scripts/settings/terrain_renderer_configuration.gd")
 
 @export_group("World Generation")
 @export var world_seed: int = 84521
@@ -103,6 +100,29 @@ const DEMO_CENTER: Vector2 = Vector2(16.0, 16.0)
 @export var cliff_repetition_correction_enabled: bool = true
 @export_range(0.0, 1.0, 0.05) var cliff_repetition_correction_strength: float = 0.95
 
+@export_group("Terrain Noise Refinement")
+@export var terrain_noise_refinement_enabled: bool = true
+@export_subgroup("Dirt")
+@export_range(0.0, 1.0, 0.05) var dirt_detail_density: float = 0.70
+@export_range(0.0, 1.0, 0.05) var dirt_detail_contrast: float = 0.68
+@export_range(0.0, 1.0, 0.05) var dirt_clear_area_coverage: float = 0.55
+@export_range(0.001, 0.02, 0.001) var dirt_detail_cluster_scale: float = 0.006
+@export_subgroup("Stone")
+@export_range(0.0, 1.0, 0.05) var stone_detail_density: float = 0.85
+@export_range(0.0, 1.0, 0.05) var stone_detail_contrast: float = 0.72
+@export_range(0.0, 1.0, 0.05) var stone_clear_area_coverage: float = 0.45
+@export_range(0.001, 0.02, 0.001) var stone_detail_cluster_scale: float = 0.005
+@export_subgroup("Mud")
+@export_range(0.0, 1.0, 0.05) var mud_detail_density: float = 0.65
+@export_range(0.0, 1.0, 0.05) var mud_detail_contrast: float = 0.55
+@export_range(0.0, 1.0, 0.05) var mud_clear_area_coverage: float = 0.60
+@export_range(0.001, 0.02, 0.001) var mud_detail_cluster_scale: float = 0.004
+@export_subgroup("Gravel")
+@export_range(0.0, 1.0, 0.05) var gravel_detail_density: float = 0.85
+@export_range(0.0, 1.0, 0.05) var gravel_detail_contrast: float = 0.72
+@export_range(0.0, 1.0, 0.05) var gravel_clear_area_coverage: float = 0.35
+@export_range(0.001, 0.02, 0.001) var gravel_detail_cluster_scale: float = 0.008
+
 @export_group("Organic Boundaries")
 @export var organic_boundaries_enabled: bool = true
 @export_range(0.0, 0.18, 0.005) var organic_edge_strength: float = 0.08
@@ -118,11 +138,31 @@ const DEMO_CENTER: Vector2 = Vector2(16.0, 16.0)
 
 @export_group("Cliff Materials")
 @export var procedural_cliff_materials_enabled: bool = true
+## L2 presentation-only shader LOD. One camera signal updates the shared cliff
+## materials; cliff geometry and authoritative terrain remain unchanged.
+@export var cliff_shader_lod_enabled: bool = true
+@export_range(0.001, 4.0, 0.001) var cliff_shader_lod_min_zoom: float = 0.125
+@export_range(0.001, 4.0, 0.001) var cliff_shader_lod_full_detail_zoom: float = 1.0
+@export_range(0.0, 1.0, 0.01) var cliff_shader_lod_min_detail: float = 0.20
+## Reversible F5 readout for the camera-to-shader LOD pipeline.
+@export var cliff_shader_lod_diagnostic_visible: bool = false
 @export var organic_cliff_geometry_enabled: bool = true
 @export var unified_cliff_components_enabled: bool = true
 @export var refined_cliff_silhouettes_enabled: bool = true
 @export var connected_cliff_contours_enabled: bool = true
 @export var unified_cliff_contours_enabled: bool = false
+## C4F comparison switch; disabled restores the C4E.1 contour path exactly.
+@export var grid_aligned_cliff_rim_enabled: bool = false
+## C4I coverage underlay; presentation-only and applied only in LEGACY mode.
+@export var legacy_cliff_coverage_repair_enabled: bool = true
+## C4K fills only the high-side alpha disagreement beside LEGACY lateral walls.
+@export var legacy_cliff_sidewall_occlusion_repair_enabled: bool = true
+## C4G comparison selector. LEGACY preserves the Boolean configuration exactly.
+@export_enum("LEGACY:0", "GRID:1", "UNIFIED:2", "STYLISED:3") var cliff_rendering_mode: int = 0:
+	set(value):
+		cliff_rendering_mode = clampi(value, 0, 3)
+		if terrain != null and is_instance_valid(terrain):
+			terrain.set_cliff_rendering_mode(cliff_rendering_mode)
 ## Phase 3G comparison; keep disabled until visual acceptance.
 @export var directional_cliff_projection_enabled: bool = false
 @export_enum("Baseline:0", "Moderate:1", "Prominent:2") var cliff_height_profile: int = 0
@@ -149,7 +189,7 @@ var cursor # CursorOverlay script instance; intentionally dynamically typed.
 var editor # WorldEditorController instance; intentionally dynamically typed.
 var resource_interaction # ResourceInteractionController; transient UI state only.
 var save_service
-var camera: Camera2D
+var camera: CameraController
 var hud: PanelContainer
 var selected_label: Label
 var zoom_label: Label
@@ -162,6 +202,7 @@ var elevation_overlay_label: Label
 var mode_label: Label
 var height_label: Label
 var debug_label: Label
+var cliff_lod_diagnostic_label: Label
 var resource_mode_label: Label
 var resource_inventory_label: Label
 var resource_inspection_label: Label
@@ -183,12 +224,7 @@ var expanded_hud_box: VBoxContainer
 var compact_hud_box: VBoxContainer
 var compact_hud_label: Label
 var compact_hud_enabled: bool = true
-var selected_id: int = 3
-var height_edit_mode: bool = false
-var _middle_panning: bool = false
 var _worst_frame_time_ms: float = 0.0
-var _last_height_paint_cell: Variant = null
-var _stroke_button: int = 0
 var _resource_inspection_refresh_accumulator: float = 0.0
 var _world_dirty: bool = false
 
@@ -211,7 +247,7 @@ func _ready() -> void:
 
 	editor = WorldEditorController.new()
 	editor.configure(terrain)
-	editor.selected_material = selected_id
+	editor.state_changed.connect(_on_editor_state_changed)
 	resource_interaction = ResourceInteractionController.new()
 	resource_interaction.configure(terrain)
 	resource_interaction.selection_changed.connect(_on_resource_selection_changed)
@@ -219,126 +255,23 @@ func _ready() -> void:
 	terrain.resource_state_manager.resource_changed.connect(_on_resource_state_changed)
 	save_service = WorldSaveService.new()
 
-	camera = Camera2D.new()
+	camera = CameraController.new()
 	camera.name = "MapCamera"
 	add_child(camera)
 	camera.make_current()
+	camera.zoom_changed.connect(_on_camera_zoom_changed)
 
 	_create_hud()
 	_create_editor_panel()
 	_update_selected_label()
-	_reset_camera()
+	camera.reset_view()
 	_update_visible_world_region()
 
 
 func _configure_terrain_renderer(renderer: TerrainRenderer) -> void:
 	## Complete configuration before add_child() initializes renderer-owned
 	## materials, procedural contexts, terrain authority, and resource state.
-	renderer.world_seed = world_seed
-	renderer.biome_frequency = biome_frequency
-	renderer.detail_frequency = detail_frequency
-	renderer.include_origin_demo = include_origin_demo
-	renderer.procedural_elevation_enabled = procedural_elevation_enabled
-	renderer.max_generated_elevation = max_generated_elevation
-	renderer.elevation_frequency = elevation_frequency
-	renderer.elevation_detail_frequency = elevation_detail_frequency
-	renderer.elevation_detail_strength = elevation_detail_strength
-	renderer.elevation_threshold_1 = elevation_threshold_1
-	renderer.elevation_threshold_2 = elevation_threshold_2
-	renderer.elevation_threshold_3 = elevation_threshold_3
-	renderer.elevation_flatness_bias = elevation_flatness_bias
-	renderer.sea_level = sea_level
-	renderer.load_margin_chunks = load_margin_chunks
-	renderer.unload_margin_chunks = unload_margin_chunks
-	renderer.chunks_created_per_frame = chunks_created_per_frame
-	renderer.profiling_enabled = chunk_profiling_enabled
-	renderer.max_chunk_processing_ms = max_chunk_processing_ms
-	renderer.chunk_work_quantum_cells = chunk_work_quantum_cells
-	renderer.max_tile_cells_per_frame = max_tile_cells_per_frame
-	renderer.texture_variation_enabled = texture_variation_enabled
-	renderer.texture_variation_strength = texture_variation_strength
-	renderer.texture_variation_frequency = texture_variation_frequency
-	renderer.clustered_grass_detail_enabled = clustered_grass_detail_enabled
-	renderer.grass_clear_area_coverage = grass_clear_area_coverage
-	renderer.grass_detail_density = grass_detail_density
-	renderer.grass_cluster_scale = grass_cluster_scale
-	renderer.grass_transition_softness = grass_transition_softness
-	renderer.grass_clear_area_residual_density = grass_clear_area_residual_density
-	renderer.grass_detail_seed_offset = grass_detail_seed_offset
-	renderer.organic_grass_color_variation_enabled = organic_grass_color_variation_enabled
-	renderer.grass_broad_variation_scale = grass_broad_variation_scale
-	renderer.grass_color_variation_strength = grass_color_variation_strength
-	renderer.grass_fine_variation_strength = grass_fine_variation_strength
-	renderer.grass_texture_repetition_correction_enabled = \
-		grass_texture_repetition_correction_enabled
-	renderer.terrain_texture_repetition_correction_enabled = \
-		terrain_texture_repetition_correction_enabled
-	renderer.terrain_texture_repetition_material_settings = {
-		1: {"enabled": sand_texture_repetition_correction_enabled,
-			"strength": sand_texture_repetition_correction_strength},
-		2: {"enabled": dirt_texture_repetition_correction_enabled,
-			"strength": dirt_texture_repetition_correction_strength},
-		4: {"enabled": stone_texture_repetition_correction_enabled,
-			"strength": stone_texture_repetition_correction_strength},
-		5: {"enabled": snow_texture_repetition_correction_enabled,
-			"strength": snow_texture_repetition_correction_strength},
-		6: {"enabled": mud_texture_repetition_correction_enabled,
-			"strength": mud_texture_repetition_correction_strength},
-		7: {"enabled": gravel_texture_repetition_correction_enabled,
-			"strength": gravel_texture_repetition_correction_strength},
-	}
-	renderer.stochastic_terrain_detail_enabled = stochastic_terrain_detail_enabled
-	renderer.stochastic_terrain_detail_material_settings = {
-		1: {"enabled": sand_stochastic_detail_enabled,
-			"intensity": sand_stochastic_detail_intensity},
-		2: {"enabled": dirt_stochastic_detail_enabled,
-			"intensity": dirt_stochastic_detail_intensity},
-		4: {"enabled": stone_stochastic_detail_enabled,
-			"intensity": stone_stochastic_detail_intensity},
-		6: {"enabled": mud_stochastic_detail_enabled,
-			"intensity": mud_stochastic_detail_intensity},
-	}
-	renderer.remaining_terrain_detail_enabled = remaining_terrain_detail_enabled
-	renderer.remaining_terrain_detail_material_settings = {
-		5: {"enabled": snow_remaining_detail_enabled,
-			"strength": snow_remaining_detail_strength},
-		7: {"enabled": gravel_remaining_detail_enabled,
-			"strength": gravel_remaining_detail_strength},
-	}
-	renderer.water_repetition_correction_enabled = water_repetition_correction_enabled
-	renderer.water_repetition_correction_strength = clampf(
-		water_repetition_correction_strength, 0.0, 1.0)
-	renderer.cliff_repetition_correction_enabled = cliff_repetition_correction_enabled
-	renderer.cliff_repetition_correction_strength = clampf(
-		cliff_repetition_correction_strength, 0.0, 1.0)
-	renderer.organic_boundaries_enabled = organic_boundaries_enabled
-	renderer.organic_edge_strength = organic_edge_strength
-	renderer.organic_edge_frequency = organic_edge_frequency
-	renderer.experimental_water_enhancement_enabled = experimental_water_enhancement_enabled
-	renderer.water_ripple_strength = clampf(water_ripple_strength, 0.0, 1.0)
-	renderer.water_secondary_ripple_scale = clampf(water_secondary_ripple_scale, 0.5, 6.0)
-	renderer.water_ripple_drift_speed = clampf(water_ripple_drift_speed, 0.0, 2.0)
-	renderer.water_glint_density = clampf(water_glint_density, 0.0, 1.0)
-	renderer.water_glint_brightness = clampf(water_glint_brightness, 0.0, 1.0)
-	renderer.procedural_cliff_materials_enabled = procedural_cliff_materials_enabled
-	renderer.organic_cliff_geometry_enabled = organic_cliff_geometry_enabled
-	renderer.unified_cliff_components_enabled = unified_cliff_components_enabled
-	renderer.refined_cliff_silhouettes_enabled = refined_cliff_silhouettes_enabled
-	renderer.connected_cliff_contours_enabled = connected_cliff_contours_enabled
-	renderer.unified_cliff_contours_enabled = unified_cliff_contours_enabled
-	renderer.directional_cliff_projection_enabled = directional_cliff_projection_enabled
-	renderer.cliff_height_profile = cliff_height_profile
-	renderer.cliff_edge_overlays_visible = cliff_edge_overlays_visible
-	renderer.cliff_shadows_visible = cliff_shadows_visible
-	renderer.decorations_enabled = decorations_enabled
-	renderer.decoration_density = decoration_density
-	renderer.decoration_clustering_strength = decoration_clustering_strength
-	renderer.decoration_seed_offset = decoration_seed_offset
-	renderer.environment_objects_enabled = environment_objects_enabled
-	renderer.procedural_vegetation_enabled = procedural_vegetation_enabled
-	renderer.environment_object_density = environment_object_density
-	renderer.environment_object_seed_offset = environment_object_seed_offset
-	renderer.berry_regrowth_seconds = berry_regrowth_seconds
+	TerrainRendererConfiguration.capture(self).apply_to(renderer)
 
 
 func _process(delta: float) -> void:
@@ -353,9 +286,8 @@ func _process(delta: float) -> void:
 			resource_interaction.refresh_selected()
 	else:
 		_resource_inspection_refresh_accumulator = 0.0
-	_update_keyboard_camera(delta)
-	if _middle_panning and not Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE):
-		_middle_panning = false
+	camera.update_keyboard_movement(delta)
+	camera.release_middle_pan_if_needed()
 	_update_visible_world_region()
 
 	var pick: Dictionary = _screen_to_world_pick(get_viewport().get_mouse_position())
@@ -374,34 +306,23 @@ func _process(delta: float) -> void:
 		cursor.brush_cells = editor.get_brush_cells(world_cell)
 		cursor.queue_redraw()
 		_update_height_label(pick)
-	cursor.enabled = not resource_interaction.resource_mode and not over_ui and not _middle_panning
+	cursor.enabled = not resource_interaction.resource_mode and not over_ui and not camera.is_middle_panning()
 	if over_ui:
 		cursor.queue_redraw()
 	_update_debug_label(pick, delta)
+	_update_cliff_lod_diagnostic()
 
-	var can_paint: bool = (
-		not resource_interaction.resource_mode
-		and not _middle_panning
-		and not Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE)
-		and not over_ui)
-	var pressed_button: int = (
-		MOUSE_BUTTON_LEFT if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-		else (MOUSE_BUTTON_RIGHT if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) else 0))
-	if _stroke_button == 0 and pressed_button != 0 and can_paint:
-		_stroke_button = pressed_button
-		editor.begin_stroke(world_cell, pressed_button == MOUSE_BUTTON_RIGHT)
-		_update_editor_summary()
-	elif _stroke_button != 0:
-		if Input.is_mouse_button_pressed(_stroke_button):
-			if can_paint:
-				editor.continue_stroke(world_cell)
-		else:
-			editor.end_stroke()
-			_stroke_button = 0
-			_update_editor_summary()
+	var can_paint: bool = _can_editor_paint(over_ui)
+	editor.update_pointer_stroke(
+		world_cell, can_paint,
+		Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT),
+		Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Controls receive input before _unhandled_input. Remaining pointer priority is
+	# resource selection first, then camera navigation; editor drags are polled in
+	# _process only while neither of those systems nor the UI owns the pointer.
 	var mouse_button := event as InputEventMouseButton
 	if mouse_button != null:
 		if (resource_interaction.resource_mode
@@ -410,21 +331,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			var pick: Dictionary = _screen_to_world_pick(mouse_button.position)
 			resource_interaction.select_at(pick.cell)
 			get_viewport().set_input_as_handled()
-		elif mouse_button.button_index == MOUSE_BUTTON_MIDDLE:
-			_middle_panning = mouse_button.pressed
-			get_viewport().set_input_as_handled()
-		elif mouse_button.pressed and mouse_button.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_zoom_toward_cursor(CAMERA_ZOOM_FACTOR)
-			get_viewport().set_input_as_handled()
-		elif mouse_button.pressed and mouse_button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_zoom_toward_cursor(1.0 / CAMERA_ZOOM_FACTOR)
+		elif camera.handle_pointer_input(mouse_button):
 			get_viewport().set_input_as_handled()
 		return
 
-	var mouse_motion := event as InputEventMouseMotion
-	if mouse_motion != null and _middle_panning:
-		camera.position -= mouse_motion.relative / camera.zoom.x
-		camera.force_update_scroll()
+	if camera.handle_pointer_input(event):
 		get_viewport().set_input_as_handled()
 
 
@@ -437,35 +348,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_save_quicksave()
 	elif key_event.ctrl_pressed and key == KEY_L:
 		_load_quicksave()
-	elif key_event.ctrl_pressed and key == KEY_Z:
-		if key_event.shift_pressed:
-			editor.redo()
-		else:
-			editor.undo()
-		_update_editor_summary()
-	elif key_event.ctrl_pressed and key == KEY_Y:
-		editor.redo()
-		_update_editor_summary()
-	elif key == KEY_BRACKETLEFT:
-		editor.change_brush_size(-1)
-		_refresh_brush_preview()
-		_update_editor_summary()
-	elif key == KEY_BRACKETRIGHT:
-		editor.change_brush_size(1)
-		_refresh_brush_preview()
-		_update_editor_summary()
-	elif key >= KEY_1 and key <= KEY_8:
-		selected_id = key - KEY_1
-		editor.selected_material = selected_id
-		_update_selected_label()
-		_update_editor_summary()
+	elif editor.handle_shortcut(key_event):
+		pass
 	elif key == KEY_R:
 		reset_confirmation.popup_centered()
 	elif key == KEY_G:
 		cursor.show_grid = not cursor.show_grid
 		cursor.queue_redraw()
-	elif key == KEY_HOME:
-		_reset_camera()
+	elif camera.handle_navigation_shortcut(key_event):
+		pass
 	elif key == KEY_F2:
 		compact_hud_enabled = not compact_hud_enabled
 		_apply_hud_mode()
@@ -474,6 +365,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif key == KEY_F4:
 		cursor.show_affected_dual_cells = not cursor.show_affected_dual_cells
 		cursor.queue_redraw()
+	elif key == KEY_F5:
+		cliff_shader_lod_diagnostic_visible = not cliff_shader_lod_diagnostic_visible
+		cliff_lod_diagnostic_label.visible = cliff_shader_lod_diagnostic_visible
+		_update_cliff_lod_diagnostic()
 	elif key == KEY_F6:
 		cursor.show_elevation_overlay = not cursor.show_elevation_overlay
 		cursor.queue_redraw()
@@ -506,76 +401,31 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		resource_interaction.debug_complete_selected()
 	elif key == KEY_ESCAPE and resource_interaction.resource_mode:
 		resource_interaction.clear_selection()
-	elif key == KEY_H:
-		height_edit_mode = not height_edit_mode
-		editor.edit_mode = (
-			WorldEditorController.EditMode.ELEVATION
-			if height_edit_mode else WorldEditorController.EditMode.MATERIAL)
-		_last_height_paint_cell = null
-		_update_mode_label()
 	elif key == KEY_P:
 		procedural_elevation_enabled = not procedural_elevation_enabled
 		terrain.set_procedural_elevation_enabled(procedural_elevation_enabled)
 		_update_procedural_label()
 
 
-func _update_keyboard_camera(delta: float) -> void:
-	var direction := Vector2(
-		float(Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT))
-			- float(Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT)),
-		float(Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN))
-			- float(Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP))
-	)
-	if not direction.is_zero_approx():
-		camera.position += direction.normalized() * CAMERA_PAN_SPEED * delta / camera.zoom.x
-		camera.force_update_scroll()
-
-
-func _zoom_toward_cursor(factor: float) -> void:
-	var old_zoom: float = camera.zoom.x
-	var new_zoom: float = clampf(old_zoom * factor, CAMERA_MIN_ZOOM, CAMERA_MAX_ZOOM)
-	if is_equal_approx(old_zoom, new_zoom):
-		return
-
-	var viewport_center: Vector2 = get_viewport_rect().size * 0.5
-	var cursor_offset: Vector2 = get_viewport().get_mouse_position() - viewport_center
-	var world_under_cursor: Vector2 = camera.position + cursor_offset / old_zoom
-	camera.zoom = Vector2.ONE * new_zoom
-	camera.position = world_under_cursor - cursor_offset / new_zoom
-	camera.force_update_scroll()
-	_update_zoom_label()
-
-
-func _reset_camera() -> void:
-	camera.position = DEMO_CENTER
-	camera.zoom = Vector2.ONE
-	camera.force_update_scroll()
-	_middle_panning = false
-	_update_zoom_label()
-
-
 func _update_visible_world_region() -> void:
-	var inverse_canvas: Transform2D = terrain.get_global_transform_with_canvas().affine_inverse()
-	var viewport_size: Vector2 = get_viewport_rect().size
-	var top_left: Vector2 = inverse_canvas * Vector2.ZERO
-	var bottom_right: Vector2 = inverse_canvas * viewport_size
-	var visible_rect := Rect2(top_left, bottom_right - top_left).abs()
+	var visible_rect: Rect2 = camera.get_visible_world_rect(terrain, get_viewport_rect().size)
 	cursor.set_visible_world_rect(visible_rect)
 	terrain.update_visible_world_rect(visible_rect)
 
 
-func _screen_to_world_cell(screen_position: Vector2) -> Vector2i:
-	return _screen_to_world_pick(screen_position).cell
-
-
 func _screen_to_world_pick(screen_position: Vector2) -> Dictionary:
 	var terrain_local: Vector2 = terrain.get_global_transform_with_canvas().affine_inverse() * screen_position
-	var target_ground: bool = height_edit_mode and Input.is_key_pressed(KEY_ALT)
+	var target_ground: bool = (
+		editor.edit_mode == WorldEditorController.EditMode.ELEVATION
+		and Input.is_key_pressed(KEY_ALT))
 	return terrain.pick_world_position(terrain_local, target_ground)
 
 
 func _mouse_over_ui() -> bool:
-	var mouse_position: Vector2 = get_viewport().get_mouse_position()
+	return _screen_position_over_ui(get_viewport().get_mouse_position())
+
+
+func _screen_position_over_ui(mouse_position: Vector2) -> bool:
 	return (
 		(hud != null and hud.visible and hud.get_global_rect().has_point(mouse_position))
 		or (editor_panel != null and editor_panel.visible
@@ -583,32 +433,62 @@ func _mouse_over_ui() -> bool:
 		or (reset_confirmation != null and reset_confirmation.visible))
 
 
-func _paint_height_cell_once(
-		world_cell: Vector2i, adjustment: int,
-		restore_generated: bool = false) -> bool:
-	if _last_height_paint_cell != null and _last_height_paint_cell == world_cell:
-		return false
-	if restore_generated:
-		terrain.restore_world_elevation(world_cell)
-	else:
-		terrain.set_world_elevation(
-			world_cell, terrain.get_world_elevation(world_cell) + adjustment)
-	_last_height_paint_cell = world_cell
-	return true
+func _can_editor_paint(over_ui: bool) -> bool:
+	return (
+		not over_ui
+		and not resource_interaction.resource_mode
+		and not camera.is_middle_panning()
+		and not Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE))
 
 
 func _update_selected_label() -> void:
+	if editor == null:
+		return
+	var state: Dictionary = editor.get_state_snapshot()
+	var selected_material: int = int(state["selected_material"])
 	for material in Catalog.MATERIALS:
-		if int(material["id"]) == selected_id:
-			selected_label.text = "Selected: %s (key %d)" % [material["name"], selected_id + 1]
+		if int(material["id"]) == selected_material:
+			selected_label.text = "Selected: %s (key %d)" % [
+				material["name"], selected_material + 1]
 			_update_compact_hud()
 			return
+
+
+func _on_editor_state_changed() -> void:
+	_update_selected_label()
+	_update_mode_label()
+	_refresh_brush_preview()
+	_update_editor_summary()
 
 
 func _update_zoom_label() -> void:
 	if zoom_label != null and camera != null:
 		zoom_label.text = "Zoom: %d%%" % roundi(camera.zoom.x * 100.0)
 		_update_compact_hud()
+
+
+func _on_camera_zoom_changed(_zoom_value: float) -> void:
+	if terrain != null and is_instance_valid(terrain):
+		terrain.set_cliff_shader_lod_zoom(_zoom_value)
+	_update_zoom_label()
+	_update_cliff_lod_diagnostic()
+
+
+func _update_cliff_lod_diagnostic() -> void:
+	if (cliff_lod_diagnostic_label == null
+			or not cliff_lod_diagnostic_label.visible
+			or terrain == null or camera == null):
+		return
+	var diagnostic: Dictionary = terrain.get_cliff_shader_lod_diagnostics()
+	cliff_lod_diagnostic_label.text = (
+		"Cliff shader LOD (F5)\n"
+		+ "Camera zoom: %.3f (%d%%)\n"
+		+ "Calculated: %.3f   Applied: %.3f\n"
+		+ "Shader actual: %.3f   Shared: %d/%s") % [
+		camera.zoom.x, roundi(camera.zoom.x * 100.0),
+		float(diagnostic.calculated_detail), float(diagnostic.applied_detail),
+		float(diagnostic.actual_material_detail), int(diagnostic.material_count),
+		"match" if bool(diagnostic.all_materials_match) else "MISMATCH"]
 
 
 func _update_variation_label() -> void:
@@ -777,9 +657,9 @@ func _replace_world_from_snapshot(snapshot: Dictionary) -> Dictionary:
 	_sync_configuration_from_terrain()
 	var camera_state: Dictionary = saved_world.get("camera", {})
 	if not camera_state.is_empty():
-		camera.position = Vector2(float(camera_state["x"]), float(camera_state["y"]))
-		camera.zoom = Vector2.ONE * float(camera_state["zoom"])
-		camera.force_update_scroll()
+		camera.apply_state(
+			Vector2(float(camera_state["x"]), float(camera_state["y"])),
+			float(camera_state["zoom"]))
 	_update_visible_world_region()
 	_update_selected_label()
 	_update_mode_label()
@@ -827,8 +707,11 @@ func _update_elevation_overlay_label() -> void:
 
 
 func _update_mode_label() -> void:
-	if mode_label != null:
-		mode_label.text = "Editing: %s (H)" % ("Elevation" if height_edit_mode else "Material")
+	if mode_label != null and editor != null:
+		var state: Dictionary = editor.get_state_snapshot()
+		mode_label.text = "Editing: %s (H)" % (
+			"Elevation" if int(state["edit_mode"]) == WorldEditorController.EditMode.ELEVATION
+			else "Material")
 		_update_compact_hud()
 
 
@@ -852,9 +735,10 @@ func _update_height_label(pick: Dictionary = {}) -> void:
 func _update_compact_hud() -> void:
 	if compact_hud_label == null or camera == null or cursor == null:
 		return
+	var editor_state: Dictionary = editor.get_state_snapshot()
 	var material_name: String = "Unknown"
 	for material in Catalog.MATERIALS:
-		if int(material["id"]) == selected_id:
+		if int(material["id"]) == int(editor_state["selected_material"]):
 			material_name = String(material["name"])
 			break
 	var totals: Dictionary = terrain.get_resource_inventory()
@@ -866,8 +750,8 @@ func _update_compact_hud() -> void:
         "%s  |  %s  |  Brush %d  |  %s\nCell %s  |  Ground %d  |  Liquid %s\nWood %d  Stone %d  Food %d  |  Zoom %d%%  |  F2: expand"
 		% [
 			material_name,
-			"Elevation" if height_edit_mode else "Material",
-			editor.brush_size if editor != null else 1,
+			"Elevation" if int(editor_state["edit_mode"]) == WorldEditorController.EditMode.ELEVATION else "Material",
+			int(editor_state["brush_size"]),
 			"RESOURCE" if resource_interaction != null and resource_interaction.resource_mode else "TERRAIN",
 			cell_material, ground_height, str(liquid_height) if liquid_height >= 0 else "none",
 			int(totals.get("wood", 0)), int(totals.get("stone", 0)), int(totals.get("food", 0)),
@@ -945,7 +829,7 @@ func _create_hud() -> void:
 	title.add_theme_font_size_override("font_size", 17)
 	box.add_child(title)
 	var instructions := Label.new()
-	instructions.text = "1 Water   2 Sand   3 Dirt   4 Grass\n5 Stone   6 Snow   7 Mud   8 Gravel\n\nH: material / elevation mode   [ / ]: brush size\nLeft-drag: selected tool   Right-drag: restore / lower\nAlt + elevation edit: target logical ground cell\nQ: terrain/resource mode   Resource click: inspect\nE: designate   C: cancel   Esc: clear   F8: DEBUG complete\nCtrl+S: quicksave   Ctrl+L: quickload\nCtrl+Z: undo   Ctrl+Y or Ctrl+Shift+Z: redo\nWASD / arrows: move   Middle-drag: pan\nWheel: zoom   Home: camera reset\nR: confirm reset edits   G: grid   V: variation\nO: organic edges   D: ground details\nT: trees / objects   P: procedural elevation\nF2: compact HUD   F3: diagnostics\nF4: cell debug   F6: heights"
+	instructions.text = "1 Water   2 Sand   3 Dirt   4 Grass\n5 Stone   6 Snow   7 Mud   8 Gravel\n\nH: material / elevation mode   [ / ]: brush size\nLeft-drag: selected tool   Right-drag: restore / lower\nAlt + elevation edit: target logical ground cell\nQ: terrain/resource mode   Resource click: inspect\nE: designate   C: cancel   Esc: clear   F8: DEBUG complete\nCtrl+S: quicksave   Ctrl+L: quickload\nCtrl+Z: undo   Ctrl+Y or Ctrl+Shift+Z: redo\nWASD / arrows: move   Middle-drag: pan\nWheel: zoom   Home: camera reset\nR: confirm reset edits   G: grid   V: variation\nO: organic edges   D: ground details\nT: trees / objects   P: procedural elevation\nF2: compact HUD   F3: diagnostics\nF4: cell debug   F5: cliff LOD   F6: heights"
 	instructions.add_theme_color_override("font_color", Color("c2d4dc"))
 	box.add_child(instructions)
 	selected_label = Label.new()
@@ -1008,6 +892,11 @@ func _create_hud() -> void:
 	debug_label.visible = false
 	debug_label.add_theme_color_override("font_color", Color("a8e6cf"))
 	box.add_child(debug_label)
+	cliff_lod_diagnostic_label = Label.new()
+	cliff_lod_diagnostic_label.visible = cliff_shader_lod_diagnostic_visible
+	cliff_lod_diagnostic_label.add_theme_color_override("font_color", Color("ffcf70"))
+	hud_content.add_child(cliff_lod_diagnostic_label)
+	_update_cliff_lod_diagnostic()
 	_apply_hud_mode()
 
 
@@ -1045,13 +934,10 @@ func _create_editor_panel() -> void:
 	editor_material_picker = OptionButton.new()
 	for material in Catalog.MATERIALS:
 		editor_material_picker.add_item(String(material.name), int(material.id))
-	editor_material_picker.select(selected_id)
+	editor_material_picker.select(int(editor.get_state_snapshot()["selected_material"]))
 	_add_editor_row("Material", editor_material_picker)
 	editor_material_picker.item_selected.connect(func(index: int) -> void:
-		selected_id = editor_material_picker.get_item_id(index)
-		editor.selected_material = selected_id
-		_update_selected_label()
-		_update_editor_summary()
+		editor.set_selected_material(editor_material_picker.get_item_id(index))
 	)
 
 	editor_mode_picker = OptionButton.new()
@@ -1059,10 +945,7 @@ func _create_editor_panel() -> void:
 	editor_mode_picker.add_item("Elevation", WorldEditorController.EditMode.ELEVATION)
 	_add_editor_row("Mode", editor_mode_picker)
 	editor_mode_picker.item_selected.connect(func(index: int) -> void:
-		editor.edit_mode = editor_mode_picker.get_item_id(index)
-		height_edit_mode = editor.edit_mode == WorldEditorController.EditMode.ELEVATION
-		_update_mode_label()
-		_update_editor_summary()
+		editor.set_edit_mode(editor_mode_picker.get_item_id(index))
 	)
 
 	editor_shape_picker = OptionButton.new()
@@ -1070,9 +953,7 @@ func _create_editor_panel() -> void:
 	editor_shape_picker.add_item("Square", WorldEditorController.BrushShape.SQUARE)
 	_add_editor_row("Shape", editor_shape_picker)
 	editor_shape_picker.item_selected.connect(func(index: int) -> void:
-		editor.brush_shape = editor_shape_picker.get_item_id(index)
-		_refresh_brush_preview()
-		_update_editor_summary()
+		editor.set_brush_shape(editor_shape_picker.get_item_id(index))
 	)
 
 	editor_size_picker = OptionButton.new()
@@ -1080,17 +961,14 @@ func _create_editor_panel() -> void:
 		editor_size_picker.add_item("%d cells" % size, size)
 	_add_editor_row("Size", editor_size_picker)
 	editor_size_picker.item_selected.connect(func(index: int) -> void:
-		editor.brush_size = editor_size_picker.get_item_id(index)
-		_refresh_brush_preview()
-		_update_editor_summary()
+		editor.set_brush_size(editor_size_picker.get_item_id(index))
 	)
 
 	editor_restore_material_toggle = CheckButton.new()
 	editor_restore_material_toggle.text = "Restore generated material"
 	editor_content.add_child(editor_restore_material_toggle)
 	editor_restore_material_toggle.toggled.connect(func(enabled: bool) -> void:
-		editor.restore_material = enabled
-		_update_editor_summary()
+		editor.set_restore_material(enabled)
 	)
 
 	editor_elevation_picker = OptionButton.new()
@@ -1101,8 +979,7 @@ func _create_editor_panel() -> void:
 	editor_elevation_picker.add_item("Restore generated", WorldEditorController.ElevationTool.RESTORE)
 	_add_editor_row("Elevation", editor_elevation_picker)
 	editor_elevation_picker.item_selected.connect(func(index: int) -> void:
-		editor.elevation_tool = editor_elevation_picker.get_item_id(index)
-		_update_editor_summary()
+		editor.set_elevation_tool(editor_elevation_picker.get_item_id(index))
 	)
 
 	editor_target_picker = OptionButton.new()
@@ -1110,8 +987,7 @@ func _create_editor_panel() -> void:
 		editor_target_picker.add_item("Level %d" % elevation, elevation)
 	_add_editor_row("Target", editor_target_picker)
 	editor_target_picker.item_selected.connect(func(index: int) -> void:
-		editor.target_elevation = editor_target_picker.get_item_id(index)
-		_update_editor_summary()
+		editor.set_target_elevation(editor_target_picker.get_item_id(index))
 	)
 
 	var history_row := HBoxContainer.new()
@@ -1127,11 +1003,9 @@ func _create_editor_panel() -> void:
 	editor_content.add_child(history_row)
 	undo_button.pressed.connect(func() -> void:
 		editor.undo()
-		_update_editor_summary()
 	)
 	redo_button.pressed.connect(func() -> void:
 		editor.redo()
-		_update_editor_summary()
 	)
 	reset_button.pressed.connect(func() -> void: reset_confirmation.popup_centered())
 
@@ -1149,7 +1023,6 @@ func _create_editor_panel() -> void:
 	add_child(reset_confirmation)
 	reset_confirmation.confirmed.connect(func() -> void:
 		editor.reset_all_edits()
-		_update_editor_summary()
 	)
 	_update_editor_summary()
 
@@ -1176,19 +1049,21 @@ func _refresh_brush_preview() -> void:
 func _update_editor_summary() -> void:
 	if editor_summary_label == null:
 		return
+	var state: Dictionary = editor.get_state_snapshot()
 	var shape_name: String = (
-		"Circle" if editor.brush_shape == WorldEditorController.BrushShape.CIRCLE else "Square")
+		"Circle" if int(state["brush_shape"]) == WorldEditorController.BrushShape.CIRCLE
+		else "Square")
 	editor_summary_label.text = "%s %d  •  Undo %d  •  Redo %d" % [
-		shape_name, editor.brush_size, editor.get_undo_count(), editor.get_redo_count()]
-	undo_button.disabled = not editor.can_undo()
-	redo_button.disabled = not editor.can_redo()
-	_select_option_id(editor_material_picker, editor.selected_material)
-	_select_option_id(editor_mode_picker, editor.edit_mode)
-	_select_option_id(editor_shape_picker, editor.brush_shape)
-	_select_option_id(editor_size_picker, editor.brush_size)
-	_select_option_id(editor_elevation_picker, editor.elevation_tool)
-	_select_option_id(editor_target_picker, editor.target_elevation)
-	editor_restore_material_toggle.set_pressed_no_signal(editor.restore_material)
+		shape_name, int(state["brush_size"]), int(state["undo_count"]), int(state["redo_count"])]
+	undo_button.disabled = not bool(state["can_undo"])
+	redo_button.disabled = not bool(state["can_redo"])
+	_select_option_id(editor_material_picker, int(state["selected_material"]))
+	_select_option_id(editor_mode_picker, int(state["edit_mode"]))
+	_select_option_id(editor_shape_picker, int(state["brush_shape"]))
+	_select_option_id(editor_size_picker, int(state["brush_size"]))
+	_select_option_id(editor_elevation_picker, int(state["elevation_tool"]))
+	_select_option_id(editor_target_picker, int(state["target_elevation"]))
+	editor_restore_material_toggle.set_pressed_no_signal(bool(state["restore_material"]))
 	_update_compact_hud()
 
 

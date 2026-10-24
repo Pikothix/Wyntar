@@ -4,5 +4,13 @@
 
 [node name="TerrainDemo" type="Node2D" unique_id=726075661]
 script = ExtResource("1_main")
+include_elevation_demo = true
+experimental_water_enhancement_enabled = true
 unified_cliff_contours_enabled = true
 directional_cliff_projection_enabled = true
+cliff_height_profile = 1
+cliff_edge_overlays_visible = false
+cliff_shadows_visible = false
+decoration_density = 2.0
+decoration_clustering_strength = 1.0
+environment_object_density = 2.0

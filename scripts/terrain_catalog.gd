@@ -55,6 +55,7 @@ const MATERIALS = [
         "stochastic_detail": true, "stochastic_detail_style": 2,
         "stochastic_base_color": "8a6343", "stochastic_detail_color": "453429",
         "stochastic_detail_density": 0.028, "stochastic_palette_variation": 0.050,
+		"terrain_noise_refinement": true,
         "variants": [
             {"texture_path": "res://art/dirt.png", "tint": "ffffff", "brightness": 1.00, "contrast": 1.00},
             {"texture_path": "res://art/dirt.png", "tint": "efd8c2", "brightness": 1.03, "contrast": 0.98},
@@ -85,6 +86,7 @@ const MATERIALS = [
         "stochastic_detail": true, "stochastic_detail_style": 3,
         "stochastic_base_color": "909ba0", "stochastic_detail_color": "59656c",
         "stochastic_detail_density": 0.034, "stochastic_palette_variation": 0.045,
+		"terrain_noise_refinement": true,
         "variants": [
             {"texture_path": "res://art/stone.png", "tint": "ffffff", "brightness": 1.00, "contrast": 1.00},
             {"texture_path": "res://art/stone.png", "tint": "e3edf2", "brightness": 1.02, "contrast": 0.98},
@@ -114,6 +116,7 @@ const MATERIALS = [
         "stochastic_detail": true, "stochastic_detail_style": 4,
         "stochastic_base_color": "815e48", "stochastic_detail_color": "423e3c",
         "stochastic_detail_density": 0.020, "stochastic_palette_variation": 0.040,
+		"terrain_noise_refinement": true,
         "variants": [
             {"texture_path": "res://art/mud.png", "tint": "ffffff", "brightness": 1.00, "contrast": 1.00},
             {"texture_path": "res://art/mud.png", "tint": "e5d2b8", "brightness": 1.00, "contrast": 0.98},
@@ -128,6 +131,7 @@ const MATERIALS = [
         "texture_repetition_scale": 0.0040,
 		"remaining_detail": true, "remaining_detail_style": 2,
 		"remaining_base_color": "a99f89", "remaining_detail_color": "625d58",
+		"terrain_noise_refinement": true,
         "variants": [
             {"texture_path": "res://art/gravel.png", "tint": "ffffff", "brightness": 1.00, "contrast": 1.00},
             {"texture_path": "res://art/gravel.png", "tint": "e8e1d6", "brightness": 1.02, "contrast": 0.98},

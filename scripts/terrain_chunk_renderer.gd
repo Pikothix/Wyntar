@@ -24,11 +24,14 @@ var priority_by_id: Dictionary
 var liquid_by_id: Dictionary
 var layers: Array[TileMapLayer] = [] # Original height-zero composition.
 var elevated_layers: Array = [] # elevation - 1 -> four TileMapLayers.
+var shared_boundary_surface_layers: Array[TileMapLayer] = [] # C4G canonical cells.
 var cliff_layers: Array[TileMapLayer] = [] # elevation - 1 -> one TileMapLayer.
 var cliff_shadow_layers: Array[TileMapLayer] = [] # elevation - 1 -> cast shadows.
 var cliff_edge_layers: Array[TileMapLayer] = [] # elevation - 1 -> side ledge cues.
 var decoration_layers: Array[TileMapLayer] = [] # visible elevation -> batched details.
 var organic_cliff_mesh_layers: Array[MeshInstance2D] = [] # One mesh per elevation.
+var organic_cliff_coverage_mesh_layers: Array[MeshInstance2D] = [] # C4I underlay.
+var organic_cliff_sidewall_occlusion_mesh_layers: Array[MeshInstance2D] = [] # C4K.
 var organic_cliff_edge_mesh_layers: Array[MeshInstance2D] = [] # Unified lips/returns.
 var organic_cliff_shadow_mesh_layers: Array[MeshInstance2D] = [] # Contour-following shadows.
 var _world_lookup: Callable
@@ -47,6 +50,10 @@ var _unified_cliff_components_enabled: bool = false
 var _refined_cliff_silhouettes_enabled: bool = false
 var _connected_cliff_contours_enabled: bool = false
 var _unified_cliff_contours_enabled: bool = false
+var _grid_aligned_cliff_rim_enabled: bool = false
+var _experimental_cliff_mode: int = OrganicCliffMeshBuilder.ExperimentalCliffMode.LEGACY
+var _legacy_cliff_coverage_repair_enabled: bool = false
+var _legacy_cliff_sidewall_occlusion_repair_enabled: bool = false
 var _cliff_edge_overlays_visible: bool = true
 var _cliff_shadows_visible: bool = true
 var _organic_cliff_world_seed: int = 0
@@ -64,6 +71,10 @@ var organic_cliff_geometry_usec: int = 0
 var organic_cliff_face_count: int = 0
 var organic_cliff_vertex_count: int = 0
 var organic_cliff_triangle_count: int = 0
+var organic_cliff_coverage_vertex_count: int = 0
+var organic_cliff_coverage_triangle_count: int = 0
+var organic_cliff_sidewall_occlusion_vertex_count: int = 0
+var organic_cliff_sidewall_occlusion_triangle_count: int = 0
 var organic_cliff_edge_component_count: int = 0
 var organic_cliff_shadow_count: int = 0
 var organic_cliff_height_query_count: int = 0
@@ -100,7 +111,11 @@ func configure(
         organic_cliff_material: Material,
         initial_max_elevation: int = 0,
         height_step: int = BASELINE_HEIGHT_STEP,
-        directional_projection_enabled: bool = false) -> void:
+        directional_projection_enabled: bool = false,
+        grid_aligned_rim_enabled: bool = false,
+        experimental_cliff_mode: int = OrganicCliffMeshBuilder.ExperimentalCliffMode.LEGACY,
+        legacy_cliff_coverage_repair_enabled: bool = false,
+        legacy_cliff_sidewall_occlusion_repair_enabled: bool = false) -> void:
     var profile_start: int = Time.get_ticks_usec() if profiling_enabled else 0
     chunk_coord = coord
     priority_by_id = priorities
@@ -125,6 +140,13 @@ func configure(
     _organic_cliff_material = organic_cliff_material
     _height_step = maxi(1, height_step)
     _directional_projection_enabled = directional_projection_enabled
+    _grid_aligned_cliff_rim_enabled = grid_aligned_rim_enabled
+    _experimental_cliff_mode = clampi(
+        experimental_cliff_mode, OrganicCliffMeshBuilder.ExperimentalCliffMode.LEGACY,
+        OrganicCliffMeshBuilder.ExperimentalCliffMode.STYLISED)
+    _legacy_cliff_coverage_repair_enabled = legacy_cliff_coverage_repair_enabled
+    _legacy_cliff_sidewall_occlusion_repair_enabled = \
+        legacy_cliff_sidewall_occlusion_repair_enabled
     position = Vector2(coord * CHUNK_SIZE * TILE_SIZE)
     name = "TerrainChunk_%d_%d" % [coord.x, coord.y]
 
@@ -138,8 +160,11 @@ func configure(
     cliff_shadow_layers.resize(MAX_ELEVATION)
     cliff_edge_layers.resize(MAX_ELEVATION)
     elevated_layers.resize(MAX_ELEVATION)
+    shared_boundary_surface_layers.resize(MAX_ELEVATION)
     decoration_layers.resize(MAX_ELEVATION + 1)
     organic_cliff_mesh_layers.resize(MAX_ELEVATION)
+    organic_cliff_coverage_mesh_layers.resize(MAX_ELEVATION)
+    organic_cliff_sidewall_occlusion_mesh_layers.resize(MAX_ELEVATION)
     organic_cliff_edge_mesh_layers.resize(MAX_ELEVATION)
     organic_cliff_shadow_mesh_layers.resize(MAX_ELEVATION)
     _active_max_elevation = clampi(initial_max_elevation, 0, MAX_ELEVATION)
@@ -296,12 +321,18 @@ func rebuild_organic_cliffs() -> void:
     organic_cliff_face_count = 0
     organic_cliff_vertex_count = 0
     organic_cliff_triangle_count = 0
+    organic_cliff_coverage_vertex_count = 0
+    organic_cliff_coverage_triangle_count = 0
+    organic_cliff_sidewall_occlusion_vertex_count = 0
+    organic_cliff_sidewall_occlusion_triangle_count = 0
     organic_cliff_edge_component_count = 0
     organic_cliff_shadow_count = 0
     organic_cliff_height_query_count = 0
     organic_cliff_material_query_count = 0
     for mesh_layers in [
             organic_cliff_mesh_layers,
+            organic_cliff_coverage_mesh_layers,
+            organic_cliff_sidewall_occlusion_mesh_layers,
             organic_cliff_edge_mesh_layers,
             organic_cliff_shadow_mesh_layers]:
         for layer in mesh_layers:
@@ -319,11 +350,19 @@ func rebuild_organic_cliffs() -> void:
         _world_lookup, _height_lookup, liquid_by_id,
         _unified_cliff_components_enabled, _refined_cliff_silhouettes_enabled,
         _connected_cliff_contours_enabled, _unified_cliff_contours_enabled,
-        _height_step, _directional_projection_enabled)
+        _height_step, _directional_projection_enabled, _grid_aligned_cliff_rim_enabled,
+        _experimental_cliff_mode, _legacy_cliff_coverage_repair_enabled,
+        _legacy_cliff_sidewall_occlusion_repair_enabled)
     organic_cliff_geometry_usec = int(result.build_usec)
     organic_cliff_face_count = int(result.face_count)
     organic_cliff_vertex_count = int(result.vertex_count)
     organic_cliff_triangle_count = int(result.triangle_count)
+    organic_cliff_coverage_vertex_count = int(result.coverage_vertex_count)
+    organic_cliff_coverage_triangle_count = int(result.coverage_triangle_count)
+    organic_cliff_sidewall_occlusion_vertex_count = int(
+        result.sidewall_occlusion_vertex_count)
+    organic_cliff_sidewall_occlusion_triangle_count = int(
+        result.sidewall_occlusion_triangle_count)
     organic_cliff_edge_component_count = int(result.edge_component_count)
     organic_cliff_shadow_count = int(result.shadow_count)
     organic_cliff_height_query_count = int(result.height_query_count)
@@ -332,6 +371,11 @@ func rebuild_organic_cliffs() -> void:
             result.meshes, organic_cliff_mesh_layers,
             _organic_face_z_offset(),
             "OrganicCliffsHeight")
+    _assign_organic_coverage_meshes(result.coverage_meshes)
+    _assign_organic_meshes(
+        result.sidewall_occlusion_meshes,
+        organic_cliff_sidewall_occlusion_mesh_layers, -3,
+        "OrganicCliffSidewallOcclusionHeight")
     if _unified_cliff_components_enabled:
         _assign_organic_meshes(
             result.edge_meshes, organic_cliff_edge_mesh_layers, 4,
@@ -339,6 +383,7 @@ func rebuild_organic_cliffs() -> void:
         _assign_organic_meshes(
             result.shadow_meshes, organic_cliff_shadow_mesh_layers, -3,
             "OrganicCliffShadowsHeight")
+    _apply_shared_boundary_surfaces(result)
     _organic_geometry_ready = true
     _set_legacy_cliff_faces_visible(false)
     _update_cliff_component_visibility()
@@ -351,6 +396,8 @@ func apply_prepared_organic_cliffs(result: Dictionary) -> int:
     _organic_geometry_ready = false
     for mesh_layers in [
             organic_cliff_mesh_layers,
+            organic_cliff_coverage_mesh_layers,
+            organic_cliff_sidewall_occlusion_mesh_layers,
             organic_cliff_edge_mesh_layers,
             organic_cliff_shadow_mesh_layers]:
         for layer in mesh_layers:
@@ -361,6 +408,14 @@ func apply_prepared_organic_cliffs(result: Dictionary) -> int:
     organic_cliff_face_count = int(result.get("face_count", 0))
     organic_cliff_vertex_count = int(result.get("vertex_count", 0))
     organic_cliff_triangle_count = int(result.get("triangle_count", 0))
+    organic_cliff_coverage_vertex_count = int(
+        result.get("coverage_vertex_count", 0))
+    organic_cliff_coverage_triangle_count = int(
+        result.get("coverage_triangle_count", 0))
+    organic_cliff_sidewall_occlusion_vertex_count = int(
+        result.get("sidewall_occlusion_vertex_count", 0))
+    organic_cliff_sidewall_occlusion_triangle_count = int(
+        result.get("sidewall_occlusion_triangle_count", 0))
     organic_cliff_edge_component_count = int(result.get("edge_component_count", 0))
     organic_cliff_shadow_count = int(result.get("shadow_count", 0))
     organic_cliff_height_query_count = int(result.get("height_query_count", 0))
@@ -374,6 +429,11 @@ func apply_prepared_organic_cliffs(result: Dictionary) -> int:
             result.get("meshes", []), organic_cliff_mesh_layers,
             _organic_face_z_offset(),
             "OrganicCliffsHeight")
+    _assign_organic_coverage_meshes(result.get("coverage_meshes", []))
+    _assign_organic_meshes(
+        result.get("sidewall_occlusion_meshes", []),
+        organic_cliff_sidewall_occlusion_mesh_layers, -3,
+        "OrganicCliffSidewallOcclusionHeight")
     if _unified_cliff_components_enabled:
         _assign_organic_meshes(
             result.get("edge_meshes", []), organic_cliff_edge_mesh_layers, 4,
@@ -381,6 +441,7 @@ func apply_prepared_organic_cliffs(result: Dictionary) -> int:
         _assign_organic_meshes(
             result.get("shadow_meshes", []), organic_cliff_shadow_mesh_layers, -3,
             "OrganicCliffShadowsHeight")
+    _apply_shared_boundary_surfaces(result)
     _organic_geometry_ready = true
     _set_legacy_cliff_faces_visible(not _organic_cliff_geometry_enabled)
     _update_cliff_component_visibility()
@@ -393,6 +454,7 @@ func mark_organic_cliff_geometry_pending() -> void:
     ## Legacy batched cliff art remains available until the new batch commits.
     _organic_geometry_ready = false
     _set_legacy_cliff_faces_visible(true)
+    _update_surface_visibility()
     _update_cliff_component_visibility()
 
 
@@ -433,10 +495,41 @@ func set_unified_cliff_contours_enabled(enabled: bool) -> void:
     mark_organic_cliff_geometry_pending()
 
 
+func set_grid_aligned_cliff_rim_enabled(enabled: bool) -> void:
+    if _grid_aligned_cliff_rim_enabled == enabled:
+        return
+    _grid_aligned_cliff_rim_enabled = enabled
+    mark_organic_cliff_geometry_pending()
+
+
+func set_experimental_cliff_mode(mode: int) -> void:
+    var value: int = clampi(
+        mode, OrganicCliffMeshBuilder.ExperimentalCliffMode.LEGACY,
+        OrganicCliffMeshBuilder.ExperimentalCliffMode.STYLISED)
+    if _experimental_cliff_mode == value:
+        return
+    _experimental_cliff_mode = value
+    mark_organic_cliff_geometry_pending()
+
+
+func set_legacy_cliff_coverage_repair_enabled(enabled: bool) -> void:
+    if _legacy_cliff_coverage_repair_enabled == enabled:
+        return
+    _legacy_cliff_coverage_repair_enabled = enabled
+    mark_organic_cliff_geometry_pending()
+
+
+func set_legacy_cliff_sidewall_occlusion_repair_enabled(enabled: bool) -> void:
+    if _legacy_cliff_sidewall_occlusion_repair_enabled == enabled:
+        return
+    _legacy_cliff_sidewall_occlusion_repair_enabled = enabled
+    mark_organic_cliff_geometry_pending()
+
+
 func _organic_face_z_offset() -> int:
     # Phase 3G keeps complete coverage behind the owning upper surface. Lower
     # terraces remain behind the whole drop, preserving Phase 3E band batching.
-    if _unified_cliff_contours_enabled:
+    if _unified_cliff_contours_enabled or _grid_aligned_cliff_rim_enabled:
         return -1 if _directional_projection_enabled else 3
     return -2
 
@@ -463,6 +556,11 @@ func set_height_step(height_step: int) -> void:
                 surface_layer.position = Vector2(
                     -TILE_SIZE.x / 2.0,
                     -TILE_SIZE.y / 2.0 - elevation * _height_step)
+        var shared_surface_layer = shared_boundary_surface_layers[elevation_index]
+        if shared_surface_layer != null:
+            shared_surface_layer.position = Vector2(
+                -TILE_SIZE.x / 2.0,
+                -TILE_SIZE.y / 2.0 - elevation * _height_step)
     for elevation in range(decoration_layers.size()):
         var decoration_layer = decoration_layers[elevation]
         if decoration_layer != null:
@@ -510,6 +608,13 @@ func get_organic_cliff_geometry_stats() -> Dictionary:
         "face_count": organic_cliff_face_count,
         "vertex_count": organic_cliff_vertex_count,
         "triangle_count": organic_cliff_triangle_count,
+        "coverage_vertex_count": organic_cliff_coverage_vertex_count,
+        "coverage_triangle_count": organic_cliff_coverage_triangle_count,
+        "coverage_mesh_count": _mesh_count(organic_cliff_coverage_mesh_layers),
+        "sidewall_occlusion_vertex_count": organic_cliff_sidewall_occlusion_vertex_count,
+        "sidewall_occlusion_triangle_count": organic_cliff_sidewall_occlusion_triangle_count,
+        "sidewall_occlusion_mesh_count": _mesh_count(
+            organic_cliff_sidewall_occlusion_mesh_layers),
         "mesh_count": mesh_count,
         "edge_component_count": organic_cliff_edge_component_count,
         "shadow_count": organic_cliff_shadow_count,
@@ -817,6 +922,14 @@ func _ensure_height_layers(elevation: int) -> void:
         surface_layer.z_index = elevation * 8 + depth
         surface_group.append(surface_layer)
     elevated_layers[index] = surface_group
+    var shared_surface_layer := _create_layer(
+        "SharedBoundarySurfaceHeight_%d" % elevation, _surface_tileset)
+    shared_surface_layer.position = Vector2(
+        -TILE_SIZE.x / 2.0,
+        -TILE_SIZE.y / 2.0 - elevation * _height_step)
+    shared_surface_layer.z_index = elevation * 8 + SLOT_COUNT - 1
+    shared_surface_layer.visible = false
+    shared_boundary_surface_layers[index] = shared_surface_layer
     _ensure_decoration_layer(elevation)
 
 
@@ -843,6 +956,20 @@ func _assign_organic_meshes(
         var layer: MeshInstance2D = _ensure_organic_component_mesh_layer(
             mesh_layers, index, z_offset, layer_prefix)
         layer.z_index = (index + 1) * 8 + z_offset
+        layer.mesh = meshes[index]
+        layer.visible = false
+
+
+func _assign_organic_coverage_meshes(meshes: Array) -> void:
+    ## Absolute z=-1 keeps C4I coverage beneath ground (0..3), every elevated
+    ## surface, and every accepted cliff face regardless of owning elevation.
+    for index in range(meshes.size()):
+        if meshes[index] == null:
+            continue
+        var layer: MeshInstance2D = _ensure_organic_component_mesh_layer(
+            organic_cliff_coverage_mesh_layers, index, -1,
+            "OrganicCliffCoverageHeight")
+        layer.z_index = -1
         layer.mesh = meshes[index]
         layer.visible = false
 
@@ -887,6 +1014,12 @@ func _update_cliff_component_visibility() -> void:
     for layer in organic_cliff_mesh_layers:
         if layer != null:
             layer.visible = show_organic and layer.mesh != null
+    for layer in organic_cliff_coverage_mesh_layers:
+        if layer != null:
+            layer.visible = show_organic and layer.mesh != null
+    for layer in organic_cliff_sidewall_occlusion_mesh_layers:
+        if layer != null:
+            layer.visible = show_organic and layer.mesh != null
     for layer in organic_cliff_edge_mesh_layers:
         if layer != null:
             layer.visible = (show_organic and _unified_cliff_components_enabled
@@ -895,6 +1028,43 @@ func _update_cliff_component_visibility() -> void:
         if layer != null:
             layer.visible = (show_organic and _unified_cliff_components_enabled
                 and _cliff_shadows_visible and layer.mesh != null)
+    _update_surface_visibility()
+
+
+func _apply_shared_boundary_surfaces(result: Dictionary) -> void:
+    for layer in shared_boundary_surface_layers:
+        if layer != null:
+            layer.clear()
+    var sources: PackedInt32Array = result.get(
+        "shared_surface_sources", PackedInt32Array())
+    var heights: PackedByteArray = result.get(
+        "shared_surface_heights", PackedByteArray())
+    if sources.size() != CHUNK_SIZE * CHUNK_SIZE or heights.size() != sources.size():
+        _update_surface_visibility()
+        return
+    for cell_index in range(sources.size()):
+        var source_id: int = int(sources[cell_index])
+        var elevation: int = int(heights[cell_index])
+        if source_id < 0 or elevation <= 0 or elevation > MAX_ELEVATION:
+            continue
+        _ensure_height_layers(elevation)
+        shared_boundary_surface_layers[elevation - 1].set_cell(
+            Vector2i(cell_index % CHUNK_SIZE, floori(float(cell_index) / CHUNK_SIZE)),
+            source_id, _atlas_pos(15))
+    _update_surface_visibility()
+
+
+func _update_surface_visibility() -> void:
+    var show_shared: bool = (
+        _organic_geometry_ready
+        and _experimental_cliff_mode >= OrganicCliffMeshBuilder.ExperimentalCliffMode.UNIFIED)
+    for surface_group in elevated_layers:
+        if surface_group != null:
+            for layer in surface_group:
+                layer.visible = not show_shared
+    for layer in shared_boundary_surface_layers:
+        if layer != null:
+            layer.visible = show_shared
 
 
 func _set_legacy_cliff_faces_visible(visible_value: bool) -> void:

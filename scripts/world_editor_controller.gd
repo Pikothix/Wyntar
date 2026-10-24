@@ -1,7 +1,10 @@
 extends RefCounted
 ## Owns transient editor tool state and bounded command history. TerrainWorld
 ## remains authoritative; this controller only submits state transitions through
-## TerrainRenderer and never stores a second editable copy of the world.
+## TerrainRenderer and never stores a second editable copy of the world. Main
+## supplies routed pointer/key intent and observes state_changed for presentation.
+
+signal state_changed
 
 const BRUSH_SIZES: Array[int] = [1, 3, 5, 7, 11]
 const HISTORY_LIMIT: int = 50
@@ -29,6 +32,7 @@ var _stroke_active: bool = false
 var _last_sampled_cell: Vector2i
 var _stroke_restore_material: bool = false
 var _stroke_elevation_tool: ElevationTool = ElevationTool.RAISE
+var _pointer_stroke_button: int = 0
 
 
 func configure(terrain_renderer) -> void:
@@ -46,9 +50,128 @@ func get_brush_cells(center: Vector2i) -> Array[Vector2i]:
     return result
 
 
+func get_state_snapshot() -> Dictionary:
+    return {
+        "edit_mode": edit_mode,
+        "brush_shape": brush_shape,
+        "brush_size": brush_size,
+        "selected_material": selected_material,
+        "elevation_tool": elevation_tool,
+        "target_elevation": target_elevation,
+        "restore_material": restore_material,
+        "undo_count": _undo_stack.size(),
+        "redo_count": _redo_stack.size(),
+        "can_undo": can_undo(),
+        "can_redo": can_redo(),
+        "pointer_stroke_active": _pointer_stroke_button != 0,
+    }
+
+
+func set_selected_material(material_id: int) -> void:
+    if selected_material == material_id:
+        return
+    selected_material = material_id
+    state_changed.emit()
+
+
+func set_edit_mode(mode: EditMode) -> void:
+    if edit_mode == mode:
+        return
+    edit_mode = mode
+    state_changed.emit()
+
+
+func set_brush_shape(shape: BrushShape) -> void:
+    if brush_shape == shape:
+        return
+    brush_shape = shape
+    state_changed.emit()
+
+
+func set_brush_size(size: int) -> void:
+    if brush_size == size or not BRUSH_SIZES.has(size):
+        return
+    brush_size = size
+    state_changed.emit()
+
+
+func set_restore_material(enabled: bool) -> void:
+    if restore_material == enabled:
+        return
+    restore_material = enabled
+    state_changed.emit()
+
+
+func set_elevation_tool(tool: ElevationTool) -> void:
+    if elevation_tool == tool:
+        return
+    elevation_tool = tool
+    state_changed.emit()
+
+
+func set_target_elevation(elevation: int) -> void:
+    if target_elevation == elevation:
+        return
+    target_elevation = elevation
+    state_changed.emit()
+
+
 func change_brush_size(direction: int) -> void:
     var index: int = BRUSH_SIZES.find(brush_size)
-    brush_size = BRUSH_SIZES[clampi(index + direction, 0, BRUSH_SIZES.size() - 1)]
+    var next_size: int = BRUSH_SIZES[clampi(index + direction, 0, BRUSH_SIZES.size() - 1)]
+    set_brush_size(next_size)
+
+
+func handle_shortcut(event: InputEventKey) -> bool:
+    if not event.pressed or event.echo:
+        return false
+    var key: int = event.keycode
+    if event.ctrl_pressed and key == KEY_Z:
+        if event.shift_pressed:
+            redo()
+        else:
+            undo()
+        return true
+    if event.ctrl_pressed and key == KEY_Y:
+        redo()
+        return true
+    if key == KEY_BRACKETLEFT:
+        change_brush_size(-1)
+        return true
+    if key == KEY_BRACKETRIGHT:
+        change_brush_size(1)
+        return true
+    if key >= KEY_1 and key <= KEY_8:
+        set_selected_material(key - KEY_1)
+        return true
+    if key == KEY_H:
+        set_edit_mode(EditMode.MATERIAL if edit_mode == EditMode.ELEVATION else EditMode.ELEVATION)
+        return true
+    return false
+
+
+func update_pointer_stroke(
+        cell: Vector2i, can_paint: bool,
+        left_pressed: bool, right_pressed: bool) -> void:
+    var pressed_button: int = (
+        MOUSE_BUTTON_LEFT if left_pressed
+        else (MOUSE_BUTTON_RIGHT if right_pressed else 0))
+    if _pointer_stroke_button == 0 and pressed_button != 0 and can_paint:
+        _pointer_stroke_button = pressed_button
+        begin_stroke(cell, pressed_button == MOUSE_BUTTON_RIGHT)
+    elif _pointer_stroke_button != 0:
+        var stroke_button_pressed: bool = (
+            left_pressed if _pointer_stroke_button == MOUSE_BUTTON_LEFT else right_pressed)
+        if stroke_button_pressed:
+            if can_paint:
+                continue_stroke(cell)
+        else:
+            end_stroke()
+            _pointer_stroke_button = 0
+
+
+func is_pointer_stroke_active() -> bool:
+    return _pointer_stroke_button != 0
 
 
 func begin_stroke(cell: Vector2i, alternate_action: bool = false) -> void:
@@ -63,6 +186,7 @@ func begin_stroke(cell: Vector2i, alternate_action: bool = false) -> void:
         _flatten_height = terrain.get_world_elevation(cell)
         target_elevation = _flatten_height
     _apply_sample(cell)
+    state_changed.emit()
 
 
 func continue_stroke(cell: Vector2i) -> void:
@@ -77,7 +201,10 @@ func end_stroke() -> bool:
     if not _stroke_active:
         return false
     _stroke_active = false
-    return _commit_pending_transaction()
+    _pointer_stroke_button = 0
+    var changed: bool = _commit_pending_transaction()
+    state_changed.emit()
+    return changed
 
 
 func cancel_stroke() -> void:
@@ -88,6 +215,8 @@ func cancel_stroke() -> void:
     _stroke_changes.clear()
     _pending_states.clear()
     _stroke_visited.clear()
+    _pointer_stroke_button = 0
+    state_changed.emit()
 
 
 func undo() -> bool:
@@ -96,6 +225,7 @@ func undo() -> bool:
     var transaction: Dictionary = _undo_stack.pop_back()
     terrain.apply_world_edit_states(_states_for_transaction(transaction, false))
     _redo_stack.append(transaction)
+    state_changed.emit()
     return true
 
 
@@ -105,6 +235,7 @@ func redo() -> bool:
     var transaction: Dictionary = _redo_stack.pop_back()
     terrain.apply_world_edit_states(_states_for_transaction(transaction, true))
     _undo_stack.append(transaction)
+    state_changed.emit()
     return true
 
 
@@ -118,7 +249,9 @@ func reset_all_edits() -> bool:
         if terrain.get_world_elevation_override_state(cell).has_override:
             _record_change(cell, "elevation", {"has_override": false, "value": 0})
     _flush_pending_preview()
-    return _commit_pending_transaction()
+    var changed: bool = _commit_pending_transaction()
+    state_changed.emit()
+    return changed
 
 
 func can_undo() -> bool:
@@ -144,8 +277,10 @@ func reset_runtime_state() -> void:
     _stroke_changes.clear()
     _pending_states.clear()
     _stroke_visited.clear()
+    _pointer_stroke_button = 0
     _undo_stack.clear()
     _redo_stack.clear()
+    state_changed.emit()
 
 
 func _apply_sample(center: Vector2i) -> void:

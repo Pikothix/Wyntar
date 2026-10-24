@@ -185,6 +185,27 @@ static func apply_remaining_terrain_detail_parameters(
 		definition.get("remaining_detail_color", "808080"))))
 
 
+static func apply_terrain_noise_refinement_parameters(
+		material: ShaderMaterial, config: Dictionary,
+		definition: Dictionary) -> void:
+	## G7 tunes presentation on the shared G5/G6 materials. The catalog remains
+	## the source of eligibility; runtime settings provide reversible controls.
+	var terrain_id: int = int(definition["id"])
+	var overrides: Dictionary = config.get("material_overrides", {})
+	var material_config: Dictionary = overrides.get(terrain_id, {})
+	var eligible: bool = bool(definition.get("terrain_noise_refinement", false))
+	material.set_shader_parameter("terrain_noise_refinement_enabled",
+		1.0 if bool(config["enabled"]) and eligible else 0.0)
+	material.set_shader_parameter("terrain_detail_density_scale", clampf(
+		float(material_config.get("density", 1.0)), 0.0, 1.0))
+	material.set_shader_parameter("terrain_detail_contrast", clampf(
+		float(material_config.get("contrast", 1.0)), 0.0, 1.0))
+	material.set_shader_parameter("terrain_clear_area_coverage", clampf(
+		float(material_config.get("clear_area", 0.0)), 0.0, 1.0))
+	material.set_shader_parameter("terrain_detail_cluster_scale", clampf(
+		float(material_config.get("cluster_scale", 0.006)), 0.001, 0.02))
+
+
 static func atlas_pos(mask: int) -> Vector2i:
 	return Vector2i(mask & 3, mask >> 2)
 
@@ -255,6 +276,8 @@ static func _create_visual_material(definition: Dictionary, tile_size: Vector2i,
 		material, config["stochastic_terrain_detail"], definition)
 	apply_remaining_terrain_detail_parameters(
 		material, config["remaining_terrain_detail"], definition)
+	apply_terrain_noise_refinement_parameters(
+		material, config["terrain_noise_refinement"], definition)
 	material.set_shader_parameter("grass_detail_luma_threshold", clampf(
 		float(definition.get("grass_detail_luma_threshold", 0.5)), 0.0, 1.0))
 	material.set_shader_parameter("grass_clear_color", Color(String(

@@ -17,8 +17,9 @@ uniform bool combined_geometry = false;
 uniform bool texture_detail_reconstruction_enabled = false;
 uniform float texture_detail_reconstruction_strength : hint_range(0.0, 1.0) = 1.0;
 uniform vec2 seed_offset = vec2(0.0);
-// Reserved for camera integration. Broad planes and beds remain at every LOD;
-// only cracks and fine weathering respond to this value.
+// L2 camera-driven shader LOD. Broad planes, bed identity, shoreline wetness,
+// role shading and silhouette remain at every LOD. Fine pigment, grain, narrow
+// strata joints, cracks and erosion fade continuously at distant zoom.
 uniform float detail_level : hint_range(0.0, 1.0) = 1.0;
 
 varying vec2 world_position;
@@ -131,16 +132,20 @@ void fragment() {
 				pigment = texture(dirt_texture, source_uv).rgb;
 			}
 		}
+		vec3 pigment_base = fragment_stone
+			? vec3(0.565, 0.608, 0.627) : vec3(0.541, 0.388, 0.263);
+		// Source textures contain one-world-pixel grain. At distance, converge
+		// toward the material's established average while retaining colour ID.
+		pigment = mix(pigment_base, pigment, detail_level);
 		if (texture_detail_reconstruction_enabled) {
 			vec2 bounded_pixel = mod(pixel, vec2(2039.0, 2029.0));
 			float pigment_macro = smooth_value_noise(
 				pixel * 0.026 + seed_offset * 0.031) - 0.5;
 			float pigment_fine = hash_value(
 				bounded_pixel + mod(seed_offset, vec2(997.0, 991.0)) * 0.047) - 0.5;
-			vec3 pigment_base = fragment_stone
-				? vec3(0.565, 0.608, 0.627) : vec3(0.541, 0.388, 0.263);
 			vec3 reconstructed_pigment = pigment_base
-				* (1.0 + pigment_macro * 0.11 + pigment_fine * 0.035);
+				* (1.0 + pigment_macro * 0.11
+					+ pigment_fine * 0.035 * detail_level);
 			pigment = mix(pigment, reconstructed_pigment,
 				texture_detail_reconstruction_strength);
 		}
@@ -174,7 +179,8 @@ void fragment() {
 		float bed_identity = hash_value(
 			vec2(band_index, 101.0) + seed_offset * 0.27) - 0.5;
 
-		float tone = 0.5 + (macro - 0.5) * 0.34 + (fine - 0.5) * 0.14;
+		float tone = 0.5 + (macro - 0.5) * 0.34
+			+ (fine - 0.5) * 0.14 * detail_level;
 		float facet_strength = 0.13;
 		float strata_strength = 0.045;
 		if (fragment_stone) {
@@ -183,7 +189,9 @@ void fragment() {
 		}
 		tone += facet * facet_strength;
 		tone += bed_identity * (fragment_stone ? 0.085 : 0.035);
-		tone -= band * strata_strength;
+		// Retain the major bed structure while softening its narrow joint at
+		// overview scales where it would otherwise flicker between screen pixels.
+		tone -= band * strata_strength * mix(0.55, 1.0, detail_level);
 		float ramp = five_step_ramp(tone);
 
 		// The source art remains micrograin while world-space planes and beds carry
@@ -214,7 +222,8 @@ void fragment() {
 			// rather than black separates the upper surface without outlining every
 			// internal facet.
 			pigment = mix(pigment, vec3(0.19, 0.17, 0.145), 0.16);
-			pigment *= mix(0.94, 1.02, smoothstep(0.35, 0.75, fine));
+			float lip_detail = mix(0.5, smoothstep(0.35, 0.75, fine), detail_level);
+			pigment *= mix(0.94, 1.02, lip_detail);
 		} else if (combined_geometry && geometry_role == 2) {
 			// Side returns use the same strata field but turn slightly away from
 			// the notional top-left light.
