@@ -20,7 +20,10 @@ func _run() -> void:
 	root.add_child(main)
 	await process_frame
 	_expect(main.terrain.world_seed == 112233, "different active world exists before load")
-	main.editor.begin_stroke(Vector2i(5, 5))
+	var history_cell := Vector2i(5, 5)
+	var existing_material: int = main.terrain.get_world_cell(history_cell)
+	main.editor.set_selected_material((existing_material + 1) % 8)
+	main.editor.begin_stroke(history_cell)
 	main.editor.end_stroke()
 	_expect(main.editor.can_undo(), "pre-load world has editor history")
 

@@ -32,6 +32,7 @@ const SHARED_PROPERTIES: Array[StringName] = [
 	&"organic_cliff_geometry_enabled", &"unified_cliff_components_enabled",
 	&"refined_cliff_silhouettes_enabled", &"connected_cliff_contours_enabled",
 	&"unified_cliff_contours_enabled", &"directional_cliff_projection_enabled",
+	&"grid_aligned_cliff_rim_enabled", &"cliff_rendering_mode",
 	&"cliff_height_profile", &"cliff_edge_overlays_visible", &"cliff_shadows_visible",
 	&"decorations_enabled", &"decoration_density", &"decoration_clustering_strength",
 	&"decoration_seed_offset", &"environment_objects_enabled",
@@ -56,6 +57,7 @@ const CLIFF_PROPERTIES: Array[StringName] = [
 	&"procedural_cliff_materials_enabled", &"organic_cliff_geometry_enabled",
 	&"unified_cliff_components_enabled", &"refined_cliff_silhouettes_enabled",
 	&"connected_cliff_contours_enabled", &"unified_cliff_contours_enabled",
+	&"grid_aligned_cliff_rim_enabled", &"cliff_rendering_mode",
 	&"directional_cliff_projection_enabled", &"cliff_height_profile",
 	&"cliff_edge_overlays_visible", &"cliff_shadows_visible",
 ]
@@ -208,6 +210,8 @@ func _configure_distinct_fixture(main) -> void:
 	main.refined_cliff_silhouettes_enabled = true
 	main.connected_cliff_contours_enabled = false
 	main.unified_cliff_contours_enabled = true
+	main.grid_aligned_cliff_rim_enabled = true
+	main.cliff_rendering_mode = TerrainRenderer.CliffRenderingMode.UNIFIED
 	main.directional_cliff_projection_enabled = true
 	main.cliff_height_profile = 1
 	main.cliff_edge_overlays_visible = false
